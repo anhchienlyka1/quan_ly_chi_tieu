@@ -1,9 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'app/app.dart';
+import 'theme/theme_provider.dart';
 
-void main() {
+/// Global ThemeProvider instance accessible throughout the app.
+/// Initialized before runApp to ensure theme is ready.
+final ThemeProvider themeProvider = ThemeProvider();
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize theme from stored preferences
+  await themeProvider.init();
 
   // Set system UI overlay style
   SystemChrome.setSystemUIOverlayStyle(
@@ -14,10 +22,10 @@ void main() {
   );
 
   // Lock orientation to portrait
-  SystemChrome.setPreferredOrientations([
+  await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
-  ]).then((_) {
-    runApp(const QuanLyChiTieuApp());
-  });
+  ]);
+
+  runApp(const QuanLyChiTieuApp());
 }
