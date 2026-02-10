@@ -7,6 +7,8 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/extensions/context_extensions.dart';
 import '../../../data/models/expense_model.dart';
 import '../../../data/repositories/expense_repository.dart';
+import '../../../data/services/budget_service.dart';
+import '../../budget/widgets/budget_progress_card.dart';
 import '../widgets/balance_card.dart';
 import '../widgets/quick_shortcuts.dart';
 import '../widgets/recent_transactions_list.dart';
@@ -21,7 +23,9 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final ExpenseRepository _repository = ExpenseRepository();
+  final BudgetService _budgetService = BudgetService();
   List<ExpenseModel> _expenses = [];
+  BudgetProgress? _budgetProgress;
   bool _isLoading = true;
   int _currentNavIndex = 0;
 
@@ -37,9 +41,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final now = DateTime.now();
       final expenses = await _repository.getExpensesByMonth(now.year, now.month);
       expenses.sort((a, b) => b.date.compareTo(a.date));
+      
+      // Load budget progress
+      final budgetProgress = await _budgetService.calculateProgress(
+        expenses: expenses,
+      );
+
       if (mounted) {
         setState(() {
           _expenses = expenses;
+          _budgetProgress = budgetProgress;
           _isLoading = false;
         });
       }
@@ -235,6 +246,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
           const Gap(28),
 
+          // Budget Progress Card
+          if (_budgetProgress != null)
+            BudgetProgressCard(
+              progress: _budgetProgress!,
+              onTap: () => _navigateAndRefresh(RouteNames.budget),
+            )
+                .animate()
+                .fade(duration: 500.ms, delay: 200.ms)
+                .slideY(begin: 0.1, end: 0, curve: Curves.easeOutCubic),
+          const Gap(28),
 
           // Quick Shortcuts
           QuickShortcuts(

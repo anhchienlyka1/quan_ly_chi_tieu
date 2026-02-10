@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../app/routes/route_names.dart';
 import '../../../core/extensions/context_extensions.dart';
 import '../../../main.dart';
 
@@ -114,6 +115,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                                   size: 16,
                                   color: Colors.grey,
                                 ),
+                                onTap: () => context.pushNamed(RouteNames.budget),
                               ),
                               _buildDivider(context),
                               

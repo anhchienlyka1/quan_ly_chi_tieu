@@ -10,4 +10,5 @@ class RouteNames {
   static const String settings = '/settings';
   static const String expenseDetail = '/expense-detail';
   static const String scanReceipt = '/scan-receipt';
+  static const String budget = '/budget';
 }

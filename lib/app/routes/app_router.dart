@@ -6,6 +6,7 @@ import '../../features/expenses/screens/add_expense_screen.dart';
 import '../../features/statistics/screens/statistics_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
 import '../../features/scan_receipt/screens/scan_receipt_screen.dart';
+import '../../features/budget/screens/budget_screen.dart';
 import '../../data/models/expense_model.dart';
 
 /// Centralized route management using onGenerateRoute.
@@ -20,6 +21,7 @@ class AppRouter {
   static const String statistics = RouteNames.statistics;
   static const String settings = RouteNames.settings;
   static const String scanReceipt = RouteNames.scanReceipt;
+  static const String budget = RouteNames.budget;
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -49,6 +51,9 @@ class AppRouter {
 
       case RouteNames.scanReceipt:
         return _buildRoute(const ScanReceiptScreen(), settings);
+
+      case RouteNames.budget:
+        return _buildRoute(const BudgetScreen(), settings);
 
       default:
         return _buildRoute(
