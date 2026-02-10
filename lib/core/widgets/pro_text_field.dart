@@ -7,17 +7,20 @@ class ProTextField extends StatelessWidget {
   final String? hintText;
   final String? labelText;
   final IconData? prefixIcon;
+  final Widget? prefix;
   final Widget? suffix;
   final String? Function(String?)? validator;
   final TextInputType? keyboardType;
   final List<TextInputFormatter>? inputFormatters;
   final int? maxLines;
+  final int? minLines;
   final int? maxLength;
   final bool obscureText;
   final ValueChanged<String>? onChanged;
   final FocusNode? focusNode;
   final bool readOnly;
   final VoidCallback? onTap;
+  final bool autofocus;
 
   const ProTextField({
     super.key,
@@ -25,17 +28,20 @@ class ProTextField extends StatelessWidget {
     this.hintText,
     this.labelText,
     this.prefixIcon,
+    this.prefix,
     this.suffix,
     this.validator,
     this.keyboardType,
     this.inputFormatters,
     this.maxLines = 1,
+    this.minLines,
     this.maxLength,
     this.obscureText = false,
     this.onChanged,
     this.focusNode,
     this.readOnly = false,
     this.onTap,
+    this.autofocus = false,
   });
 
   @override
@@ -60,18 +66,21 @@ class ProTextField extends StatelessWidget {
           keyboardType: keyboardType,
           inputFormatters: inputFormatters,
           maxLines: maxLines,
+          minLines: minLines,
           maxLength: maxLength,
           obscureText: obscureText,
           onChanged: onChanged,
           focusNode: focusNode,
           readOnly: readOnly,
           onTap: onTap,
+          autofocus: autofocus,
           style: Theme.of(context).textTheme.bodyLarge,
           decoration: InputDecoration(
             hintText: hintText,
             prefixIcon: prefixIcon != null
                 ? Icon(prefixIcon, size: 22)
                 : null,
+            prefix: prefix,
             suffix: suffix,
             counterText: '', // Hide max length counter
           ),

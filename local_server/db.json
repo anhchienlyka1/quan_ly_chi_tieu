@@ -19,6 +19,26 @@
       "note": "Full bình",
       "createdAt": "2026-02-09T17:30:00.000",
       "type": "expense"
+    },
+    {
+      "id": null,
+      "title": "an com",
+      "amount": 1000000,
+      "category": "food",
+      "date": "2026-02-10T16:50:47.453348",
+      "note": null,
+      "createdAt": "2026-02-10T16:50:47.453372",
+      "type": "expense"
+    },
+    {
+      "id": null,
+      "title": "tiền luong",
+      "amount": 100000000,
+      "category": "salary",
+      "date": "2026-02-10T17:02:15.419754",
+      "note": null,
+      "createdAt": "2026-02-10T17:02:15.419790",
+      "type": "income"
     }
   ],
   "categories": [

@@ -223,7 +223,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             totalExpense: _totalExpense,
             monthLabel:
                 'Tháng ${DateTime.now().month}/${DateTime.now().year}',
-            onTap: () => context.pushNamed(RouteNames.statistics),
+            onTap: () => context.pushNamed(RouteNames.expenseList),
           )
               .animate()
               .fade(duration: 600.ms, delay: 100.ms)

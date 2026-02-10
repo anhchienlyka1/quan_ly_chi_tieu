@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import '../../../core/extensions/context_extensions.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/currency_input_formatter.dart';
 import '../../../core/widgets/pro_button.dart';
 import '../../../core/widgets/pro_text_field.dart';
 import '../../../data/models/expense_model.dart';
@@ -40,9 +42,16 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     _selectedType = widget.expense?.type ?? widget.initialType ?? TransactionType.expense;
     _selectedCategory = widget.expense?.category ?? ExpenseCategory.food;
     
-    _amountController = TextEditingController(
-      text: widget.expense?.amount.toStringAsFixed(0) ?? '',
-    );
+    // Format initial amount properly
+    String initialAmount = '';
+    if (widget.expense != null) {
+      // Use formatter logic to format initial value
+      final formatter = CurrencyInputFormatter();
+      final val = TextEditingValue(text: widget.expense!.amount.toStringAsFixed(0));
+      initialAmount = formatter.formatEditUpdate(TextEditingValue.empty, val).text;
+    }
+
+    _amountController = TextEditingController(text: initialAmount);
     _titleController = TextEditingController(
       text: widget.expense?.title ?? '',
     );
@@ -80,7 +89,9 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
   Future<void> _saveExpense() async {
     if (_formKey.currentState!.validate()) {
-      final amount = double.tryParse(_amountController.text) ?? 0;
+      // Remove non-digits to get raw number
+      final cleanAmount = _amountController.text.replaceAll(RegExp(r'[^0-9]'), '');
+      final amount = double.tryParse(cleanAmount) ?? 0;
       
       // Create updated or new model
       final expense = ExpenseModel(
@@ -130,17 +141,54 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               ? 'Chỉnh sửa giao dịch' 
               : (_selectedType == TransactionType.expense ? 'Thêm chi tiêu' : 'Thêm thu nhập')
         ),
+        actions: [
+          IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.close_rounded),
+          ),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
           child: Padding(
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16),
             child: Form(
               key: _formKey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                   // Amount input (Moved to top for better UX)
+                  ProTextField(
+                    controller: _amountController,
+                    labelText: 'Số tiền',
+                    hintText: '0',
+                    // Use Text prefix instead of Icon for currency symbol
+                    prefix: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        '₫',
+                        style: context.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: context.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      CurrencyInputFormatter(),
+                    ],
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Vui lòng nhập số tiền';
+                      }
+                      return null;
+                    },
+                    autofocus: !_isEditing, // Autofocus only for new entries
+                  ),
+                  const Gap(16),
+
                   // Type Selector
                   Container(
                     padding: const EdgeInsets.all(4),
@@ -168,23 +216,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                       ],
                     ),
                   ),
-                  const Gap(24),
-
-                  // Amount input
-                  ProTextField(
-                    controller: _amountController,
-                    labelText: 'Số tiền',
-                    hintText: '0 ₫',
-                    prefixIcon: Icons.attach_money_rounded,
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Vui lòng nhập số tiền';
-                      }
-                      return null;
-                    },
-                  ),
-                  const Gap(20),
+                  const Gap(16),
 
                   // Title
                   ProTextField(
@@ -192,7 +224,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                     labelText: 'Tiêu đề',
                     hintText: _selectedType == TransactionType.expense 
                         ? 'VD: Ăn trưa, Đổ xăng...' 
-                        : 'VD: Lương tháng 2, Thưởng tết...',
+                        : 'VD: Lương tháng 2...',
                     prefixIcon: Icons.edit_rounded,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -201,7 +233,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                       return null;
                     },
                   ),
-                  const Gap(20),
+                  const Gap(16),
 
                   // Category selector
                   Text(
@@ -213,17 +245,18 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                   ),
                   const Gap(8),
                   _buildCategorySelector(context),
-                  const Gap(20),
+                  const Gap(16),
 
-                  // Note
+                  // Note (Compact)
                   ProTextField(
                     controller: _noteController,
                     labelText: 'Ghi chú (tùy chọn)',
                     hintText: 'Thêm ghi chú...',
                     prefixIcon: Icons.notes_rounded,
-                    maxLines: 3,
+                    maxLines: 1, 
+                    minLines: 1,
                   ),
-                  const Gap(32),
+                  const Gap(24),
 
                   // Save button
                   ProButton(
@@ -234,6 +267,9 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                     backgroundColor: _selectedType == TransactionType.expense ? AppColors.primary : AppColors.success,
                     onPressed: _saveExpense,
                   ),
+                  
+                  // Bottom padding to avoid keyboard overlay issues
+                  const Gap(24),
                 ],
               ),
             ),

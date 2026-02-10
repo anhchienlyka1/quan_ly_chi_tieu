@@ -68,6 +68,25 @@ class SettingsScreen extends StatelessWidget {
                 const SizedBox(height: 24),
                 _buildSettingsGroup(
                   context,
+                  title: 'Tự động hóa',
+                  items: [
+                    _buildSettingsItem(
+                      context,
+                      icon: Icons.auto_mode_rounded,
+                      label: 'Ghi chi tiêu tự động',
+                      trailing: Switch(
+                        value: false,
+                        onChanged: (value) {
+                          // TODO: Implement banking notification listener in next phase
+                          context.showSnackBar('Chức năng này sẽ sớm ra mắt trong tương lai!');
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                _buildSettingsGroup(
+                  context,
                   title: 'Dữ liệu',
                   items: [
                     _buildSettingsItem(
