@@ -7,7 +7,8 @@
       "category": "food",
       "date": "2026-02-10T08:00:00.000",
       "note": "Uống với đồng nghiệp",
-      "createdAt": "2026-02-10T08:00:00.000"
+      "createdAt": "2026-02-10T08:00:00.000",
+      "type": "expense"
     },
     {
       "id": "2",
@@ -16,14 +17,27 @@
       "category": "transport",
       "date": "2026-02-09T17:30:00.000",
       "note": "Full bình",
-      "createdAt": "2026-02-09T17:30:00.000"
+      "createdAt": "2026-02-09T17:30:00.000",
+      "type": "expense"
     }
   ],
   "categories": [
-    { "id": "1", "name": "Ăn uống", "type": "expense" },
-    { "id": "2", "name": "Di chuyển", "type": "expense" }
+    {
+      "id": "1",
+      "name": "Ăn uống",
+      "type": "expense"
+    },
+    {
+      "id": "2",
+      "name": "Di chuyển",
+      "type": "expense"
+    }
   ],
   "users": [
-    { "id": "1", "name": "Admin", "email": "admin@example.com" }
+    {
+      "id": "1",
+      "name": "Admin",
+      "email": "admin@example.com"
+    }
   ]
 }

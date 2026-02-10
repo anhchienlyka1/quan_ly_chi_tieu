@@ -10,6 +10,7 @@ class ProButton extends StatefulWidget {
   final bool isOutlined;
   final IconData? icon;
   final double? width;
+  final Color? backgroundColor;
 
   const ProButton({
     super.key,
@@ -19,6 +20,7 @@ class ProButton extends StatefulWidget {
     this.isOutlined = false,
     this.icon,
     this.width,
+    this.backgroundColor,
   });
 
   @override
@@ -118,6 +120,7 @@ class _ProButtonState extends State<ProButton> with SingleTickerProviderStateMix
                           widget.onPressed?.call();
                         },
                   style: FilledButton.styleFrom(
+                    backgroundColor: widget.backgroundColor,
                     minimumSize: const Size.fromHeight(56),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),

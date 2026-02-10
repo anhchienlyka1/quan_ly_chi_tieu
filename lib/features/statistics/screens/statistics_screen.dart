@@ -9,6 +9,7 @@ class StatisticsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: context.theme.scaffoldBackgroundColor,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('Thống kê'),
       ),
       body: SafeArea(
