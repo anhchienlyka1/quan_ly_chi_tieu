@@ -41,4 +41,7 @@ extension DateExtensions on DateTime {
     if (isYesterday) return 'Hôm qua';
     return toShortDate;
   }
+
+  /// Method alias for relativeDate getter
+  String toRelativeDate() => relativeDate;
 }

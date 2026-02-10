@@ -1,0 +1,1692 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chi Tiêu Gia Đình - UI Preview</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: #e8e8ee;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 40px 20px;
+      gap: 32px;
+      flex-wrap: wrap;
+    }
+
+    .phone-frame {
+      width: 375px;
+      min-height: 812px;
+      background: #F7F8FC;
+      border-radius: 40px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15), 0 0 0 2px #d1d1d6;
+      position: relative;
+    }
+
+    .phone-label {
+      text-align: center;
+      font-weight: 700;
+      color: #555;
+      margin-bottom: 12px;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .phone-content {
+      padding: 0;
+      height: 812px;
+      overflow-y: auto;
+      scroll-behavior: smooth;
+    }
+
+    .phone-content::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* Colors */
+    :root {
+      --primary: #2EC4B6;
+      --primary-light: #5EDDD0;
+      --primary-dark: #1A9E92;
+      --accent: #FF6B6B;
+      --accent-light: #FF9A9A;
+      --husband: #4A90D9;
+      --husband-light: #E8F0FA;
+      --wife: #E88CA5;
+      --wife-light: #FCEDF1;
+      --text-dark: #1A1A2E;
+      --text-medium: #6B7280;
+      --text-light: #9CA3AF;
+      --surface: #F7F8FC;
+      --card: #FFFFFF;
+      --divider: #F0F0F5;
+      --cat-food: #FF6B6B;
+      --cat-rent: #6C5CE7;
+      --cat-utilities: #FFB946;
+      --cat-transport: #54A0FF;
+      --cat-children: #2ECC71;
+      --cat-ceremony: #E88CA5;
+      --cat-shopping: #FECA57;
+      --cat-health: #00D2D3;
+      --cat-education: #5F27CD;
+      --cat-other: #8395A7;
+      --success: #2ECC71;
+      --warning: #FFB946;
+      --error: #EE5A6A;
+    }
+
+    /* SCREEN 1: HOME */
+    .header {
+      display: flex;
+      align-items: center;
+      padding: 16px 20px 12px;
+    }
+
+    .header-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, var(--husband), var(--wife));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 18px;
+    }
+
+    .header-text {
+      margin-left: 14px;
+      flex: 1;
+    }
+
+    .header-greeting {
+      color: var(--text-medium);
+      font-size: 13px;
+    }
+
+    .header-name {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text-dark);
+    }
+
+    .header-bell {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      background: var(--card);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+      cursor: pointer;
+      transition: transform 0.2s;
+      font-size: 18px;
+      color: var(--text-light);
+    }
+
+    .header-bell:hover {
+      transform: scale(1.05);
+    }
+
+    .summary-card {
+      margin: 0 20px;
+      padding: 24px;
+      border-radius: 24px;
+      background: linear-gradient(135deg, #2EC4B6, #26D0CE);
+      box-shadow: 0 12px 24px rgba(46, 196, 182, 0.25);
+      color: white;
+    }
+
+    .summary-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .summary-month {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      opacity: 0.85;
+    }
+
+    .summary-month-icon {
+      background: rgba(255, 255, 255, 0.15);
+      padding: 6px;
+      border-radius: 10px;
+      font-size: 14px;
+    }
+
+    .summary-badge {
+      background: rgba(255, 255, 255, 0.15);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .summary-amount {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .summary-label {
+      font-size: 12px;
+      opacity: 0.7;
+      margin-top: 4px;
+    }
+
+    .budget-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      opacity: 0.7;
+      margin-bottom: 6px;
+    }
+
+    .budget-remaining {
+      opacity: 0.9;
+      font-weight: 600;
+    }
+
+    .budget-bar {
+      height: 8px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 6px;
+    }
+
+    .budget-fill {
+      height: 100%;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 10px;
+      transition: width 1s ease;
+    }
+
+    .budget-msg {
+      font-size: 11px;
+      opacity: 0.7;
+    }
+
+    .couple-bar-card {
+      margin: 20px;
+      padding: 18px;
+      background: var(--card);
+      border-radius: 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    }
+
+    .couple-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-medium);
+      font-weight: 600;
+      margin-bottom: 14px;
+    }
+
+    .couple-stacked {
+      display: flex;
+      height: 12px;
+      border-radius: 8px;
+      overflow: hidden;
+      gap: 2px;
+    }
+
+    .couple-h-bar {
+      background: var(--husband);
+      border-radius: 8px 0 0 8px;
+    }
+
+    .couple-w-bar {
+      background: var(--wife);
+      border-radius: 0 8px 8px 0;
+    }
+
+    .couple-legend {
+      display: flex;
+      gap: 16px;
+      margin-top: 14px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      flex: 1;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      margin-top: 3px;
+      flex-shrink: 0;
+    }
+
+    .legend-label {
+      font-size: 11px;
+      color: var(--text-light);
+    }
+
+    .legend-amount {
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 20px;
+      margin-top: 24px;
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-dark);
+    }
+
+    .section-link {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--primary);
+      cursor: pointer;
+    }
+
+    .category-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      padding: 0 20px;
+    }
+
+    .cat-item {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 14px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.03);
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .cat-item:hover {
+      transform: translateY(-2px);
+    }
+
+    .cat-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+
+    .cat-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-medium);
+      text-align: center;
+    }
+
+    .expense-item {
+      background: var(--card);
+      border-radius: 18px;
+      padding: 16px;
+      margin: 0 20px 10px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+      transition: transform 0.2s;
+      cursor: pointer;
+    }
+
+    .expense-item:hover {
+      transform: translateX(4px);
+    }
+
+    .expense-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .expense-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .expense-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-dark);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .expense-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+      font-size: 10px;
+    }
+
+    .spender-tag {
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 10px;
+    }
+
+    .expense-date {
+      color: var(--text-light);
+      font-size: 11px;
+    }
+
+    .expense-amount {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+
+    /* Bottom Nav */
+    .bottom-nav {
+      position: sticky;
+      bottom: 0;
+      background: var(--card);
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.04);
+      border-radius: 0;
+    }
+
+    .nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 8px 0;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .nav-item:hover {
+      transform: translateY(-2px);
+    }
+
+    .nav-icon {
+      font-size: 22px;
+    }
+
+    .nav-label {
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .nav-item.active .nav-icon {
+      color: var(--primary);
+    }
+
+    .nav-item.active .nav-label {
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .nav-item:not(.active) .nav-icon {
+      color: var(--text-light);
+    }
+
+    .nav-item:not(.active) .nav-label {
+      color: var(--text-light);
+    }
+
+    .nav-fab {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .nav-fab-btn {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #2EC4B6, #26D0CE);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 26px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(46, 196, 182, 0.3);
+      transition: transform 0.2s;
+    }
+
+    .nav-fab-btn:hover {
+      transform: scale(1.1);
+    }
+
+    /* SCREEN 2: ADD EXPENSE */
+    .add-appbar {
+      display: flex;
+      align-items: center;
+      padding: 16px 20px;
+      gap: 12px;
+    }
+
+    .add-back {
+      font-size: 20px;
+      cursor: pointer;
+      color: var(--text-dark);
+    }
+
+    .add-title {
+      font-size: 20px;
+      font-weight: 700;
+      flex: 1;
+      text-align: center;
+      color: var(--text-dark);
+    }
+
+    .amount-card {
+      margin: 0 20px;
+      padding: 24px;
+      border-radius: 24px;
+      background: linear-gradient(135deg, #2EC4B6, #26D0CE);
+      box-shadow: 0 8px 16px rgba(46, 196, 182, 0.2);
+      text-align: center;
+      color: white;
+    }
+
+    .amount-label {
+      font-size: 14px;
+      opacity: 0.8;
+      margin-bottom: 12px;
+    }
+
+    .amount-input {
+      font-size: 36px;
+      font-weight: 800;
+      background: none;
+      border: none;
+      color: white;
+      text-align: center;
+      width: 100%;
+      outline: none;
+    }
+
+    .amount-input::placeholder {
+      color: rgba(255, 255, 255, 0.3);
+    }
+
+    .amount-currency {
+      font-size: 12px;
+      opacity: 0.5;
+      letter-spacing: 2px;
+      margin-top: 4px;
+    }
+
+    .form-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-medium);
+      padding: 20px 20px 10px;
+    }
+
+    .spender-row {
+      display: flex;
+      gap: 10px;
+      padding: 0 20px;
+    }
+
+    .spender-btn {
+      flex: 1;
+      padding: 14px;
+      border-radius: 14px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 1.5px solid transparent;
+      background: var(--card);
+    }
+
+    .spender-btn.active-h {
+      background: var(--husband-light);
+      border-color: var(--husband);
+    }
+
+    .spender-btn.active-w {
+      background: var(--wife-light);
+      border-color: var(--wife);
+    }
+
+    .spender-btn.active-b {
+      background: rgba(46, 196, 182, 0.08);
+      border-color: var(--primary);
+    }
+
+    .spender-icon {
+      font-size: 20px;
+      margin-bottom: 4px;
+    }
+
+    .spender-label {
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .text-input {
+      margin: 0 20px;
+      padding: 16px 20px;
+      border-radius: 16px;
+      border: 1px solid var(--divider);
+      font-family: 'Outfit';
+      font-size: 14px;
+      width: calc(100% - 40px);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .text-input:focus {
+      border-color: var(--primary);
+    }
+
+    .cat-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 0 20px;
+    }
+
+    .cat-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: var(--card);
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 1.5px solid transparent;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .cat-chip.active {
+      font-weight: 700;
+    }
+
+    .row-inputs {
+      display: flex;
+      gap: 12px;
+      padding: 0 20px;
+    }
+
+    .row-input-box {
+      flex: 1;
+      padding: 16px;
+      border-radius: 16px;
+      border: 1px solid var(--divider);
+      background: var(--card);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .row-input-box:hover {
+      border-color: var(--primary);
+    }
+
+    .row-input-label {
+      font-size: 11px;
+      color: var(--text-light);
+      margin-bottom: 2px;
+    }
+
+    .row-input-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-dark);
+    }
+
+    .save-btn {
+      margin: 20px;
+      padding: 18px;
+      border-radius: 16px;
+      text-align: center;
+      background: linear-gradient(135deg, #2EC4B6, #26D0CE);
+      color: white;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 6px 16px rgba(46, 196, 182, 0.25);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .save-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(46, 196, 182, 0.35);
+    }
+
+    /* SCREEN 3: STATISTICS */
+    .stats-header {
+      padding: 16px 20px;
+    }
+
+    .stats-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-dark);
+    }
+
+    .tab-selector {
+      display: flex;
+      gap: 0;
+      background: var(--card);
+      border-radius: 14px;
+      padding: 4px;
+      margin: 0 20px 16px;
+    }
+
+    .tab-item {
+      flex: 1;
+      padding: 10px;
+      text-align: center;
+      border-radius: 11px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-light);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-item.active {
+      background: var(--primary);
+      color: white;
+      font-weight: 700;
+    }
+
+    .chart-card {
+      margin: 0 20px;
+      padding: 24px;
+      background: var(--card);
+      border-radius: 24px;
+      text-align: center;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.03);
+    }
+
+    .donut-container {
+      width: 200px;
+      height: 200px;
+      margin: 0 auto 16px;
+      position: relative;
+    }
+
+    .donut-center {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .donut-total {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--text-dark);
+    }
+
+    .donut-total-label {
+      font-size: 12px;
+      color: var(--text-light);
+    }
+
+    .chart-legend {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 14px;
+    }
+
+    .chart-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-light);
+    }
+
+    .chart-legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+    }
+
+    .comparison-card {
+      margin: 20px;
+      padding: 18px;
+      background: var(--card);
+      border-radius: 20px;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.02);
+    }
+
+    .comparison-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-medium);
+      margin-bottom: 16px;
+    }
+
+    .comparison-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .comparison-label {
+      width: 40px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .comparison-bar-bg {
+      flex: 1;
+      height: 10px;
+      border-radius: 5px;
+    }
+
+    .comparison-bar-fill {
+      height: 10px;
+      border-radius: 5px;
+    }
+
+    .comparison-amount {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-medium);
+      width: 50px;
+      text-align: right;
+    }
+
+    .cat-breakdown-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px;
+      background: var(--card);
+      border-radius: 16px;
+      margin: 0 20px 8px;
+    }
+
+    .cat-break-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .cat-break-info {
+      flex: 1;
+    }
+
+    .cat-break-top {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    .cat-break-name {
+      font-weight: 600;
+    }
+
+    .cat-break-amount {
+      font-weight: 700;
+      color: var(--text-medium);
+    }
+
+    .cat-break-bar {
+      height: 6px;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .cat-break-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+    }
+
+    .cat-break-pct {
+      font-size: 12px;
+      font-weight: 600;
+      width: 36px;
+      text-align: right;
+    }
+
+    /* SCREEN 4: SETTINGS */
+    .settings-couple-card {
+      margin: 0 20px;
+      padding: 20px;
+      border-radius: 24px;
+      background: linear-gradient(to right, var(--husband), var(--wife));
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: white;
+      box-shadow: 0 8px 20px rgba(46, 196, 182, 0.15);
+    }
+
+    .settings-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .settings-heart {
+      font-size: 18px;
+    }
+
+    .settings-names {
+      flex: 1;
+    }
+
+    .settings-family-name {
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .settings-family-sub {
+      font-size: 11px;
+      opacity: 0.7;
+    }
+
+    .settings-group {
+      padding: 0 20px;
+      margin-top: 20px;
+    }
+
+    .settings-group-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 10px;
+    }
+
+    .settings-card {
+      background: var(--card);
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    }
+
+    .settings-item {
+      display: flex;
+      align-items: center;
+      padding: 14px 16px;
+      gap: 14px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .settings-item:hover {
+      background: rgba(0, 0, 0, 0.02);
+    }
+
+    .settings-item-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .settings-item-label {
+      flex: 1;
+      font-size: 14px;
+      color: var(--text-dark);
+    }
+
+    .settings-item-trailing {
+      font-size: 13px;
+      color: var(--text-light);
+    }
+
+    .settings-divider {
+      height: 1px;
+      background: var(--divider);
+      margin-left: 64px;
+    }
+
+    .toggle-switch {
+      width: 44px;
+      height: 24px;
+      border-radius: 12px;
+      background: var(--primary);
+      position: relative;
+      cursor: pointer;
+    }
+
+    .toggle-knob {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: white;
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      transition: transform 0.2s;
+    }
+
+    .settings-tagline {
+      text-align: center;
+      padding: 32px 20px;
+      font-size: 13px;
+      color: var(--text-light);
+      font-style: italic;
+    }
+
+    .screen-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ==================== SCREEN 0: INTRO ==================== -->
+  <div class="screen-container">
+    <div class="phone-label">🚀 Giới thiệu</div>
+    <div class="phone-frame" style="background: linear-gradient(135deg, #E0F7FA, #FCE4EC, #FFFFFF);">
+      <div class="phone-content" style="display: flex; flex-direction: column; height: 100%;">
+        <div style="flex: 2;"></div>
+
+        <!-- Illustration -->
+        <div
+          style="position: relative; width: 280px; height: 280px; margin: 0 auto; display: flex; align-items: center; justify-content: center;">
+          <div
+            style="position: absolute; top: 20px; left: 20px; width: 120px; height: 120px; background: rgba(74,144,217,0.1); border-radius: 50%;">
+          </div>
+          <div
+            style="position: absolute; bottom: 20px; right: 20px; width: 140px; height: 140px; background: rgba(232,140,165,0.1); border-radius: 50%;">
+          </div>
+
+          <div style="position: relative; display: flex; flex-direction: column; align-items: center;">
+            <div
+              style="background: white; padding: 24px; border-radius: 50%; box-shadow: 0 10px 30px rgba(46,196,182,0.2);">
+              <div style="font-size: 64px; color: var(--primary);">🏠</div>
+            </div>
+            <div style="height: 24px;"></div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div
+                style="background: rgba(74,144,217,0.1); padding: 12px; border-radius: 50%; color: var(--husband); font-size: 32px;">
+                👨</div>
+              <div style="font-size: 24px; color: var(--accent); animation: heartbeat 1.5s infinite;">❤️</div>
+              <div
+                style="background: rgba(232,140,165,0.1); padding: 12px; border-radius: 50%; color: var(--wife); font-size: 32px;">
+                👩</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="flex: 1;"></div>
+
+        <!-- Text Content -->
+        <div style="padding: 0 32px; text-align: center;">
+          <h2
+            style="font-size: 28px; font-weight: 700; color: var(--text-dark); line-height: 1.2; margin-bottom: 16px;">
+            Tiền bạc rõ ràng,<br>gia đình nhẹ nhàng
+          </h2>
+          <p style="font-size: 16px; color: var(--text-medium); line-height: 1.5;">
+            Cùng nhau ghi chép, thấu hiểu chi tiêu<br>và vun vén cho tổ ấm hạnh phúc. 💕
+          </p>
+        </div>
+
+        <div style="flex: 3;"></div>
+
+        <!-- Action Button -->
+        <div style="padding: 0 32px 40px;">
+          <div style="
+          background: linear-gradient(135deg, #2EC4B6, #26D0CE);
+          color: white; padding: 18px; border-radius: 16px; text-align: center;
+          font-size: 18px; font-weight: 700; cursor: pointer;
+          box-shadow: 0 8px 20px rgba(46,196,182,0.3);
+          transition: transform 0.2s;
+        " onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+            Bắt đầu ngay
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SCREEN 1: HOME ==================== -->
+  <div class="screen-container">
+    <div class="phone-label">🏠 Trang chủ</div>
+    <div class="phone-frame">
+      <div class="phone-content">
+        <!-- Header -->
+        <div class="header">
+          <div class="header-avatar">❤️</div>
+          <div class="header-text">
+            <div class="header-greeting">Chào buổi sáng! ☀️</div>
+            <div class="header-name">Gia đình Minh 💕</div>
+          </div>
+          <div class="header-bell">🔔</div>
+        </div>
+
+        <!-- Summary Card -->
+        <div class="summary-card">
+          <div class="summary-top">
+            <div class="summary-month">
+              <span class="summary-month-icon">📅</span>
+              Tháng 2/2026
+            </div>
+            <div class="summary-badge">Chi tiết →</div>
+          </div>
+          <div class="summary-amount">6.035.000 ₫</div>
+          <div class="summary-label">Tổng chi tiêu gia đình</div>
+          <div style="margin-top: 20px;">
+            <div class="budget-row">
+              <span>Ngân sách: 15.000.000 ₫</span>
+              <span class="budget-remaining">Còn lại: 8.965.000 ₫</span>
+            </div>
+            <div class="budget-bar">
+              <div class="budget-fill" style="width: 40%;"></div>
+            </div>
+            <div class="budget-msg">Chi tiêu hợp lý, tuyệt vời! 👍</div>
+          </div>
+        </div>
+
+        <!-- Couple Spending Bar -->
+        <div class="couple-bar-card">
+          <div class="couple-title">👫 Chi tiêu hai vợ chồng</div>
+          <div class="couple-stacked">
+            <div class="couple-h-bar" style="flex: 92;"></div>
+            <div class="couple-w-bar" style="flex: 8;"></div>
+          </div>
+          <div class="couple-legend">
+            <div class="legend-item">
+              <div class="legend-dot" style="background: var(--husband);"></div>
+              <div>
+                <div class="legend-label">Chồng (92%)</div>
+                <div class="legend-amount" style="color: var(--husband);">5.530.000 ₫</div>
+              </div>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background: var(--wife);"></div>
+              <div>
+                <div class="legend-label">Vợ (8%)</div>
+                <div class="legend-amount" style="color: var(--wife);">505.000 ₫</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Category Grid -->
+        <div class="section-header">
+          <div class="section-title">Danh mục chi tiêu</div>
+        </div>
+        <div class="category-grid">
+          <div class="cat-item">
+            <div class="cat-icon" style="background: rgba(255,107,107,0.1);">🍜</div>
+            <div class="cat-label">Ăn uống</div>
+          </div>
+          <div class="cat-item">
+            <div class="cat-icon" style="background: rgba(108,92,231,0.1);">🏠</div>
+            <div class="cat-label">Tiền nhà</div>
+          </div>
+          <div class="cat-item">
+            <div class="cat-icon" style="background: rgba(255,185,70,0.1);">⚡</div>
+            <div class="cat-label">Điện nước</div>
+          </div>
+          <div class="cat-item">
+            <div class="cat-icon" style="background: rgba(84,160,255,0.1);">⛽</div>
+            <div class="cat-label">Xăng xe</div>
+          </div>
+          <div class="cat-item">
+            <div class="cat-icon" style="background: rgba(46,204,113,0.1);">👶</div>
+            <div class="cat-label">Con cái</div>
+          </div>
+          <div class="cat-item">
+            <div class="cat-icon" style="background: rgba(232,140,165,0.1);">💐</div>
+            <div class="cat-label">Hiếu hỉ</div>
+          </div>
+          <div class="cat-item">
+            <div class="cat-icon" style="background: rgba(254,202,87,0.1);">🛒</div>
+            <div class="cat-label">Mua sắm</div>
+          </div>
+          <div class="cat-item">
+            <div class="cat-icon" style="background: rgba(131,149,167,0.1);">📌</div>
+            <div class="cat-label">Khác</div>
+          </div>
+        </div>
+
+        <!-- Recent Expenses -->
+        <div class="section-header">
+          <div class="section-title">Chi tiêu gần đây</div>
+          <div class="section-link">Xem tất cả</div>
+        </div>
+
+        <div class="expense-item">
+          <div class="expense-icon" style="background: rgba(255,107,107,0.1);">🍜</div>
+          <div class="expense-info">
+            <div class="expense-title">Đi chợ buổi sáng</div>
+            <div class="expense-meta">
+              <span class="spender-tag" style="background: var(--wife-light); color: var(--wife);">Vợ</span>
+              <span>💵</span>
+              <span class="expense-date">Hôm nay</span>
+            </div>
+          </div>
+          <div class="expense-amount">-185.000 ₫</div>
+        </div>
+
+        <div class="expense-item">
+          <div class="expense-icon" style="background: rgba(84,160,255,0.1);">⛽</div>
+          <div class="expense-info">
+            <div class="expense-title">Đổ xăng xe máy</div>
+            <div class="expense-meta">
+              <span class="spender-tag" style="background: var(--husband-light); color: var(--husband);">Chồng</span>
+              <span>💵</span>
+              <span class="expense-date">Hôm nay</span>
+            </div>
+          </div>
+          <div class="expense-amount">-80.000 ₫</div>
+        </div>
+
+        <div class="expense-item">
+          <div class="expense-icon" style="background: rgba(255,185,70,0.1);">⚡</div>
+          <div class="expense-info">
+            <div class="expense-title">Tiền điện tháng 2</div>
+            <div class="expense-meta">
+              <span class="spender-tag" style="background: var(--husband-light); color: var(--husband);">Chồng</span>
+              <span>🏦</span>
+              <span class="expense-date">Hôm qua</span>
+            </div>
+          </div>
+          <div class="expense-amount">-450.000 ₫</div>
+        </div>
+
+        <div class="expense-item">
+          <div class="expense-icon" style="background: rgba(46,204,113,0.1);">👶</div>
+          <div class="expense-info">
+            <div class="expense-title">Sữa và tã cho bé</div>
+            <div class="expense-meta">
+              <span class="spender-tag" style="background: var(--wife-light); color: var(--wife);">Vợ</span>
+              <span>🏦</span>
+              <span class="expense-date">Hôm qua</span>
+            </div>
+          </div>
+          <div class="expense-amount">-320.000 ₫</div>
+        </div>
+
+        <div class="expense-item">
+          <div class="expense-icon" style="background: rgba(108,92,231,0.1);">🏠</div>
+          <div class="expense-info">
+            <div class="expense-title">Tiền nhà tháng 2</div>
+            <div class="expense-meta">
+              <span class="spender-tag" style="background: var(--husband-light); color: var(--husband);">Chồng</span>
+              <span>🏦</span>
+              <span class="expense-date">08/02/2026</span>
+            </div>
+          </div>
+          <div class="expense-amount">-5.000.000 ₫</div>
+        </div>
+
+        <div style="height: 80px;"></div>
+
+        <!-- Bottom Nav -->
+        <div class="bottom-nav">
+          <div class="nav-item active">
+            <div class="nav-icon">🏠</div>
+            <div class="nav-label">Trang chủ</div>
+          </div>
+          <div class="nav-item">
+            <div class="nav-icon">📋</div>
+            <div class="nav-label">Chi tiêu</div>
+          </div>
+          <div class="nav-fab">
+            <div class="nav-fab-btn">＋</div>
+          </div>
+          <div class="nav-item">
+            <div class="nav-icon">📊</div>
+            <div class="nav-label">Thống kê</div>
+          </div>
+          <div class="nav-item">
+            <div class="nav-icon">⚙️</div>
+            <div class="nav-label">Cài đặt</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SCREEN 2: ADD EXPENSE ==================== -->
+  <div class="screen-container">
+    <div class="phone-label">➕ Thêm chi tiêu</div>
+    <div class="phone-frame">
+      <div class="phone-content">
+        <div class="add-appbar">
+          <div class="add-back">‹</div>
+          <div class="add-title">Thêm chi tiêu</div>
+          <div style="width: 20px;"></div>
+        </div>
+
+        <div class="amount-card">
+          <div class="amount-label">Số tiền chi tiêu</div>
+          <input class="amount-input" placeholder="0 ₫" value="150.000">
+          <div class="amount-currency">VND</div>
+        </div>
+
+        <div class="form-label">Ai chi?</div>
+        <div class="spender-row">
+          <div class="spender-btn active-h">
+            <div class="spender-icon">👨</div>
+            <div class="spender-label" style="color: var(--husband);">Chồng</div>
+          </div>
+          <div class="spender-btn">
+            <div class="spender-icon">👩</div>
+            <div class="spender-label" style="color: var(--text-light);">Vợ</div>
+          </div>
+          <div class="spender-btn">
+            <div class="spender-icon">👫</div>
+            <div class="spender-label" style="color: var(--text-light);">Cả hai</div>
+          </div>
+        </div>
+
+        <div class="form-label">Tiêu đề</div>
+        <input class="text-input" placeholder="VD: Ăn trưa, Đổ xăng, Mua sữa..." value="Ăn phở sáng">
+
+        <div class="form-label">Danh mục</div>
+        <div class="cat-wrap">
+          <div class="cat-chip active"
+            style="background: rgba(255,107,107,0.12); border-color: var(--cat-food); color: var(--cat-food);">🍜 Ăn
+            uống</div>
+          <div class="cat-chip">🏠 Tiền nhà</div>
+          <div class="cat-chip">⚡ Điện nước</div>
+          <div class="cat-chip">⛽ Xăng xe</div>
+          <div class="cat-chip">👶 Con cái</div>
+          <div class="cat-chip">💐 Hiếu hỉ</div>
+          <div class="cat-chip">🛒 Mua sắm</div>
+          <div class="cat-chip">💊 Sức khỏe</div>
+          <div class="cat-chip">📚 Giáo dục</div>
+          <div class="cat-chip">📌 Khác</div>
+        </div>
+
+        <div class="form-label">Ngày & Hình thức</div>
+        <div class="row-inputs">
+          <div class="row-input-box">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="color: var(--primary);">📅</span>
+              <div>
+                <div class="row-input-label">Ngày</div>
+                <div class="row-input-value">Hôm nay</div>
+              </div>
+            </div>
+          </div>
+          <div class="row-input-box">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="color: var(--primary);">💵</span>
+              <div style="flex: 1;">
+                <div class="row-input-label">Hình thức</div>
+                <div class="row-input-value">Tiền mặt</div>
+              </div>
+              <span style="color: var(--text-light); font-size: 12px;">⇄</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-label">Ghi chú (tùy chọn)</div>
+        <input class="text-input" placeholder="Thêm ghi chú..." value="">
+
+        <div class="save-btn">✓ Lưu chi tiêu</div>
+        <div style="height: 20px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SCREEN 3: STATISTICS ==================== -->
+  <div class="screen-container">
+    <div class="phone-label">📊 Thống kê</div>
+    <div class="phone-frame">
+      <div class="phone-content">
+        <div class="stats-header">
+          <div class="stats-title">Thống kê</div>
+        </div>
+
+        <div class="tab-selector">
+          <div class="tab-item">Tuần</div>
+          <div class="tab-item active">Tháng</div>
+          <div class="tab-item">Năm</div>
+        </div>
+
+        <div class="chart-card">
+          <div class="donut-container">
+            <svg viewBox="0 0 200 200" style="transform: rotate(-90deg);">
+              <circle cx="100" cy="100" r="80" fill="none" stroke="#F0F0F5" stroke-width="24" />
+              <circle cx="100" cy="100" r="80" fill="none" stroke="#6C5CE7" stroke-width="24" stroke-dasharray="236 502"
+                stroke-dashoffset="0" stroke-linecap="round" />
+              <circle cx="100" cy="100" r="80" fill="none" stroke="#FF6B6B" stroke-width="24" stroke-dasharray="118 502"
+                stroke-dashoffset="-236" stroke-linecap="round" />
+              <circle cx="100" cy="100" r="80" fill="none" stroke="#2ECC71" stroke-width="24" stroke-dasharray="57 502"
+                stroke-dashoffset="-354" stroke-linecap="round" />
+              <circle cx="100" cy="100" r="80" fill="none" stroke="#FFB946" stroke-width="24" stroke-dasharray="31 502"
+                stroke-dashoffset="-411" stroke-linecap="round" />
+              <circle cx="100" cy="100" r="80" fill="none" stroke="#E88CA5" stroke-width="24" stroke-dasharray="24 502"
+                stroke-dashoffset="-442" stroke-linecap="round" />
+              <circle cx="100" cy="100" r="80" fill="none" stroke="#54A0FF" stroke-width="24" stroke-dasharray="17 502"
+                stroke-dashoffset="-466" stroke-linecap="round" />
+            </svg>
+            <div class="donut-center">
+              <div class="donut-total">10.6Tr</div>
+              <div class="donut-total-label">Tổng chi tiêu</div>
+            </div>
+          </div>
+          <div class="chart-legend">
+            <div class="chart-legend-item">
+              <div class="chart-legend-dot" style="background: #6C5CE7;"></div>Tiền nhà
+            </div>
+            <div class="chart-legend-item">
+              <div class="chart-legend-dot" style="background: #FF6B6B;"></div>Ăn uống
+            </div>
+            <div class="chart-legend-item">
+              <div class="chart-legend-dot" style="background: #2ECC71;"></div>Con cái
+            </div>
+            <div class="chart-legend-item">
+              <div class="chart-legend-dot" style="background: #FFB946;"></div>Điện nước
+            </div>
+          </div>
+        </div>
+
+        <div class="comparison-card">
+          <div class="comparison-title">So sánh chi tiêu</div>
+          <div class="comparison-row">
+            <div class="comparison-label" style="color: var(--husband);">Chồng</div>
+            <div style="flex: 1; position: relative;">
+              <div class="comparison-bar-bg" style="background: rgba(74,144,217,0.1);"></div>
+              <div class="comparison-bar-fill"
+                style="background: var(--husband); width: 55%; position: absolute; top: 0;"></div>
+            </div>
+            <div class="comparison-amount">5.88Tr</div>
+          </div>
+          <div class="comparison-row">
+            <div class="comparison-label" style="color: var(--wife);">Vợ</div>
+            <div style="flex: 1; position: relative;">
+              <div class="comparison-bar-bg" style="background: rgba(232,140,165,0.1);"></div>
+              <div class="comparison-bar-fill" style="background: var(--wife); width: 45%; position: absolute; top: 0;">
+              </div>
+            </div>
+            <div class="comparison-amount">4.72Tr</div>
+          </div>
+        </div>
+
+        <div class="section-header">
+          <div class="section-title">Chi tiết theo danh mục</div>
+        </div>
+
+        <div class="cat-breakdown-item">
+          <div class="cat-break-icon" style="background: rgba(108,92,231,0.1);">🏠</div>
+          <div class="cat-break-info">
+            <div class="cat-break-top"><span class="cat-break-name">Tiền nhà</span><span
+                class="cat-break-amount">5.000.000 ₫</span></div>
+            <div class="cat-break-bar" style="background: rgba(108,92,231,0.1);">
+              <div class="cat-break-bar-fill" style="background: #6C5CE7; width: 47%;"></div>
+            </div>
+          </div>
+          <div class="cat-break-pct" style="color: #6C5CE7;">47%</div>
+        </div>
+        <div class="cat-breakdown-item">
+          <div class="cat-break-icon" style="background: rgba(255,107,107,0.1);">🍜</div>
+          <div class="cat-break-info">
+            <div class="cat-break-top"><span class="cat-break-name">Ăn uống</span><span
+                class="cat-break-amount">2.500.000 ₫</span></div>
+            <div class="cat-break-bar" style="background: rgba(255,107,107,0.1);">
+              <div class="cat-break-bar-fill" style="background: #FF6B6B; width: 24%;"></div>
+            </div>
+          </div>
+          <div class="cat-break-pct" style="color: #FF6B6B;">24%</div>
+        </div>
+        <div class="cat-breakdown-item">
+          <div class="cat-break-icon" style="background: rgba(46,204,113,0.1);">👶</div>
+          <div class="cat-break-info">
+            <div class="cat-break-top"><span class="cat-break-name">Con cái</span><span
+                class="cat-break-amount">1.200.000 ₫</span></div>
+            <div class="cat-break-bar" style="background: rgba(46,204,113,0.1);">
+              <div class="cat-break-bar-fill" style="background: #2ECC71; width: 11%;"></div>
+            </div>
+          </div>
+          <div class="cat-break-pct" style="color: #2ECC71;">11%</div>
+        </div>
+        <div class="cat-breakdown-item">
+          <div class="cat-break-icon" style="background: rgba(255,185,70,0.1);">⚡</div>
+          <div class="cat-break-info">
+            <div class="cat-break-top"><span class="cat-break-name">Điện nước</span><span
+                class="cat-break-amount">650.000 ₫</span></div>
+            <div class="cat-break-bar" style="background: rgba(255,185,70,0.1);">
+              <div class="cat-break-bar-fill" style="background: #FFB946; width: 6%;"></div>
+            </div>
+          </div>
+          <div class="cat-break-pct" style="color: #FFB946;">6%</div>
+        </div>
+        <div class="cat-breakdown-item">
+          <div class="cat-break-icon" style="background: rgba(232,140,165,0.1);">💐</div>
+          <div class="cat-break-info">
+            <div class="cat-break-top"><span class="cat-break-name">Hiếu hỉ</span><span class="cat-break-amount">500.000
+                ₫</span></div>
+            <div class="cat-break-bar" style="background: rgba(232,140,165,0.1);">
+              <div class="cat-break-bar-fill" style="background: #E88CA5; width: 5%;"></div>
+            </div>
+          </div>
+          <div class="cat-break-pct" style="color: #E88CA5;">5%</div>
+        </div>
+
+        <div style="height: 80px;"></div>
+
+        <div class="bottom-nav">
+          <div class="nav-item">
+            <div class="nav-icon">🏠</div>
+            <div class="nav-label">Trang chủ</div>
+          </div>
+          <div class="nav-item">
+            <div class="nav-icon">📋</div>
+            <div class="nav-label">Chi tiêu</div>
+          </div>
+          <div class="nav-fab">
+            <div class="nav-fab-btn">＋</div>
+          </div>
+          <div class="nav-item active">
+            <div class="nav-icon">📊</div>
+            <div class="nav-label">Thống kê</div>
+          </div>
+          <div class="nav-item">
+            <div class="nav-icon">⚙️</div>
+            <div class="nav-label">Cài đặt</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SCREEN 4: SETTINGS ==================== -->
+  <div class="screen-container">
+    <div class="phone-label">⚙️ Cài đặt</div>
+    <div class="phone-frame">
+      <div class="phone-content">
+        <div class="stats-header">
+          <div class="stats-title">Cài đặt</div>
+        </div>
+
+        <div class="settings-couple-card">
+          <div class="settings-avatar">M</div>
+          <div class="settings-heart">❤️</div>
+          <div class="settings-avatar">H</div>
+          <div class="settings-names" style="margin-left: 12px;">
+            <div class="settings-family-name">Gia đình Minh & Hạnh</div>
+            <div class="settings-family-sub">Cùng nhau quản lý tài chính</div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">Giao diện</div>
+          <div class="settings-card">
+            <div class="settings-item">
+              <div class="settings-item-icon" style="background: rgba(46,196,182,0.1);">🎨</div>
+              <div class="settings-item-label">Chế độ tối</div>
+              <div class="toggle-switch">
+                <div class="toggle-knob"></div>
+              </div>
+            </div>
+            <div class="settings-divider"></div>
+            <div class="settings-item">
+              <div class="settings-item-icon" style="background: rgba(84,160,255,0.1);">🌐</div>
+              <div class="settings-item-label">Ngôn ngữ</div>
+              <div class="settings-item-trailing">Tiếng Việt</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">Ngân sách</div>
+          <div class="settings-card">
+            <div class="settings-item">
+              <div class="settings-item-icon" style="background: rgba(255,185,70,0.1);">💰</div>
+              <div class="settings-item-label">Ngân sách hàng tháng</div>
+              <div class="settings-item-trailing">›</div>
+            </div>
+            <div class="settings-divider"></div>
+            <div class="settings-item">
+              <div class="settings-item-icon" style="background: rgba(232,140,165,0.1);">🔔</div>
+              <div class="settings-item-label" style="font-size: 13px;">
+                Nhắc nhở ngân sách
+                <div style="font-size: 11px; color: var(--text-light); margin-top: 2px;">Nhắc nhở nhẹ nhàng khi gần hết
+                  ngân sách</div>
+              </div>
+              <div class="toggle-switch">
+                <div class="toggle-knob"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">Gia đình</div>
+          <div class="settings-card">
+            <div class="settings-item">
+              <div class="settings-item-icon" style="background: var(--husband-light);">👨</div>
+              <div class="settings-item-label">Tên chồng</div>
+              <div class="settings-item-trailing">Minh</div>
+            </div>
+            <div class="settings-divider"></div>
+            <div class="settings-item">
+              <div class="settings-item-icon" style="background: var(--wife-light);">👩</div>
+              <div class="settings-item-label">Tên vợ</div>
+              <div class="settings-item-trailing">Hạnh</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">Dữ liệu</div>
+          <div class="settings-card">
+            <div class="settings-item">
+              <div class="settings-item-icon" style="background: rgba(46,204,113,0.1);">📥</div>
+              <div class="settings-item-label">Xuất dữ liệu (Excel)</div>
+              <div class="settings-item-trailing">›</div>
+            </div>
+            <div class="settings-divider"></div>
+            <div class="settings-item">
+              <div class="settings-item-icon" style="background: rgba(84,160,255,0.1);">☁️</div>
+              <div class="settings-item-label">Đồng bộ dữ liệu</div>
+              <div class="settings-item-trailing">›</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-tagline">Cùng nhau quản lý, hạnh phúc bền lâu 💕</div>
+
+        <div style="height: 60px;"></div>
+
+        <div class="bottom-nav">
+          <div class="nav-item">
+            <div class="nav-icon">🏠</div>
+            <div class="nav-label">Trang chủ</div>
+          </div>
+          <div class="nav-item">
+            <div class="nav-icon">📋</div>
+            <div class="nav-label">Chi tiêu</div>
+          </div>
+          <div class="nav-fab">
+            <div class="nav-fab-btn">＋</div>
+          </div>
+          <div class="nav-item">
+            <div class="nav-icon">📊</div>
+            <div class="nav-label">Thống kê</div>
+          </div>
+          <div class="nav-item active">
+            <div class="nav-icon">⚙️</div>
+            <div class="nav-label">Cài đặt</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+
+</html>

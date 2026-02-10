@@ -2,28 +2,146 @@
   "expenses": [
     {
       "id": "1",
-      "title": "Cà phê sáng",
-      "amount": 35000,
+      "title": "Đi chợ buổi sáng",
+      "amount": 185000,
       "category": "food",
-      "date": "2026-02-10T08:00:00.000",
-      "note": "Uống với đồng nghiệp",
-      "createdAt": "2026-02-10T08:00:00.000"
+      "date": "2026-02-10T07:00:00.000",
+      "note": "Mua rau, thịt, cá",
+      "spender": "wife",
+      "paymentMethod": "cash",
+      "createdAt": "2026-02-10T07:00:00.000"
     },
     {
       "id": "2",
-      "title": "Đổ xăng",
-      "amount": 100000,
+      "title": "Đổ xăng xe máy",
+      "amount": 80000,
       "category": "transport",
-      "date": "2026-02-09T17:30:00.000",
+      "date": "2026-02-10T08:30:00.000",
       "note": "Full bình",
-      "createdAt": "2026-02-09T17:30:00.000"
+      "spender": "husband",
+      "paymentMethod": "cash",
+      "createdAt": "2026-02-10T08:30:00.000"
+    },
+    {
+      "id": "3",
+      "title": "Tiền điện tháng 2",
+      "amount": 450000,
+      "category": "utilities",
+      "date": "2026-02-09T10:00:00.000",
+      "note": "Thanh toán qua app",
+      "spender": "husband",
+      "paymentMethod": "bankTransfer",
+      "createdAt": "2026-02-09T10:00:00.000"
+    },
+    {
+      "id": "4",
+      "title": "Sữa và tã cho bé",
+      "amount": 320000,
+      "category": "children",
+      "date": "2026-02-09T14:00:00.000",
+      "note": "Meiji và Bobby",
+      "spender": "wife",
+      "paymentMethod": "bankTransfer",
+      "createdAt": "2026-02-09T14:00:00.000"
+    },
+    {
+      "id": "5",
+      "title": "Tiền nhà tháng 2",
+      "amount": 5000000,
+      "category": "rent",
+      "date": "2026-02-08T09:00:00.000",
+      "note": "Chuyển khoản cho chủ nhà",
+      "spender": "husband",
+      "paymentMethod": "bankTransfer",
+      "createdAt": "2026-02-08T09:00:00.000"
+    },
+    {
+      "id": "6",
+      "title": "Đám cưới bạn An",
+      "amount": 500000,
+      "category": "ceremony",
+      "date": "2026-02-07T11:00:00.000",
+      "note": "Mừng cưới",
+      "spender": "both",
+      "paymentMethod": "cash",
+      "createdAt": "2026-02-07T11:00:00.000"
+    },
+    {
+      "id": "7",
+      "title": "Ăn phở sáng",
+      "amount": 70000,
+      "category": "food",
+      "date": "2026-02-07T07:00:00.000",
+      "note": "Phở bò tái",
+      "spender": "husband",
+      "paymentMethod": "cash",
+      "createdAt": "2026-02-07T07:00:00.000"
     }
   ],
   "categories": [
-    { "id": "1", "name": "Ăn uống", "type": "expense" },
-    { "id": "2", "name": "Di chuyển", "type": "expense" }
+    {
+      "id": "1",
+      "name": "Ăn uống",
+      "type": "food"
+    },
+    {
+      "id": "2",
+      "name": "Tiền nhà",
+      "type": "rent"
+    },
+    {
+      "id": "3",
+      "name": "Điện nước",
+      "type": "utilities"
+    },
+    {
+      "id": "4",
+      "name": "Xăng xe",
+      "type": "transport"
+    },
+    {
+      "id": "5",
+      "name": "Con cái",
+      "type": "children"
+    },
+    {
+      "id": "6",
+      "name": "Hiếu hỉ",
+      "type": "ceremony"
+    },
+    {
+      "id": "7",
+      "name": "Mua sắm",
+      "type": "shopping"
+    },
+    {
+      "id": "8",
+      "name": "Sức khỏe",
+      "type": "health"
+    },
+    {
+      "id": "9",
+      "name": "Giáo dục",
+      "type": "education"
+    },
+    {
+      "id": "10",
+      "name": "Khác",
+      "type": "other"
+    }
   ],
   "users": [
-    { "id": "1", "name": "Admin", "email": "admin@example.com" }
+    {
+      "id": "1",
+      "name": "Minh",
+      "role": "husband",
+      "email": "minh@family.vn"
+    },
+    {
+      "id": "2",
+      "name": "Hạnh",
+      "role": "wife",
+      "email": "hanh@family.vn"
+    }
   ]
 }
