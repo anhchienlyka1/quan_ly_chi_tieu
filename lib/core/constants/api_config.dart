@@ -7,11 +7,11 @@ class ApiConfig {
   ApiConfig._();
 
   // Port of your local server (e.g., Node.js, JSON Server, Python)
-  static const int _port = 3000; 
+  static const int _port = 3000;
 
   // For physical device testing, replace this with your computer's LAN IP
   // e.g., '192.168.1.5'
-  static const String _lanIp = '192.168.1.5'; 
+  static const String _lanIp = '192.168.1.5';
 
   /// Base URL that adapts to the platform.
   static String get baseUrl {
@@ -30,8 +30,8 @@ class ApiConfig {
   }
 
   // Timeouts
-  static const Duration connectTimeout = Duration(seconds: 10);
-  static const Duration receiveTimeout = Duration(seconds: 10);
+  static const Duration connectTimeout = Duration(seconds: 30);
+  static const Duration receiveTimeout = Duration(seconds: 30);
 
   // Endpoints
   static const String expenses = '/expenses';

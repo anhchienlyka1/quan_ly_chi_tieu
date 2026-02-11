@@ -58,8 +58,9 @@ class _BudgetScreenState extends State<BudgetScreen>
           _totalBudgetController.text = budget.totalBudget.toInt().toString();
         }
         for (final entry in budget.categoryBudgets.entries) {
-          _categoryControllers[entry.key]?.text =
-              entry.value.toInt().toString();
+          _categoryControllers[entry.key]?.text = entry.value
+              .toInt()
+              .toString();
           _categoryEnabled[entry.key] = true;
         }
         _isLoading = false;
@@ -82,8 +83,7 @@ class _BudgetScreenState extends State<BudgetScreen>
     final categoryBudgets = <ExpenseCategory, double>{};
     for (final cat in _expenseCategories) {
       if (_categoryEnabled[cat] == true) {
-        final text =
-            _categoryControllers[cat]?.text.replaceAll(',', '') ?? '';
+        final text = _categoryControllers[cat]?.text.replaceAll(',', '') ?? '';
         final amount = double.tryParse(text) ?? 0;
         if (amount > 0) {
           categoryBudgets[cat] = amount;
@@ -227,22 +227,13 @@ class _BudgetScreenState extends State<BudgetScreen>
                 padding: const EdgeInsets.fromLTRB(8, 8, 24, 40),
                 child: Row(
                   children: [
-                    // Back button
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(
-                        Icons.arrow_back_ios_rounded,
-                        color: Colors.white,
-                      ),
-                    ),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Ngân sách hàng tháng',
-                            style:
-                                context.textTheme.headlineMedium?.copyWith(
+                            style: context.textTheme.headlineMedium?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                               height: 1.2,
@@ -404,8 +395,7 @@ class _BudgetScreenState extends State<BudgetScreen>
     );
   }
 
-  Widget _buildQuickAmountChip(
-      BuildContext context, int amount, String label) {
+  Widget _buildQuickAmountChip(BuildContext context, int amount, String label) {
     final currentText = _totalBudgetController.text.replaceAll(',', '');
     final currentAmount = int.tryParse(currentText) ?? 0;
     final isSelected = currentAmount == amount;
@@ -424,8 +414,8 @@ class _BudgetScreenState extends State<BudgetScreen>
           color: isSelected
               ? const Color(0xFF10B981)
               : (context.isDarkMode
-                  ? Colors.white.withOpacity(0.05)
-                  : const Color(0xFF10B981).withOpacity(0.08)),
+                    ? Colors.white.withOpacity(0.05)
+                    : const Color(0xFF10B981).withOpacity(0.08)),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
@@ -521,7 +511,9 @@ class _BudgetScreenState extends State<BudgetScreen>
   }
 
   Widget _buildCategoryBudgetItem(
-      BuildContext context, ExpenseCategory category) {
+    BuildContext context,
+    ExpenseCategory category,
+  ) {
     final isEnabled = _categoryEnabled[category] ?? false;
 
     return Padding(
@@ -535,11 +527,7 @@ class _BudgetScreenState extends State<BudgetScreen>
               color: category.color.withOpacity(0.15),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              category.icon,
-              size: 20,
-              color: category.color,
-            ),
+            child: Icon(category.icon, size: 20, color: category.color),
           ),
           const Gap(14),
 
@@ -554,10 +542,21 @@ class _BudgetScreenState extends State<BudgetScreen>
             ),
           ),
 
-          // Amount or toggle
+          // Amount input field
           if (isEnabled) ...[
-            SizedBox(
-              width: 120,
+            Container(
+              width: 130,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: context.isDarkMode
+                    ? Colors.white.withOpacity(0.05)
+                    : category.color.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: category.color.withOpacity(0.3),
+                  width: 1.5,
+                ),
+              ),
               child: TextField(
                 controller: _categoryControllers[category],
                 keyboardType: TextInputType.number,
@@ -568,19 +567,22 @@ class _BudgetScreenState extends State<BudgetScreen>
                   color: category.color,
                 ),
                 decoration: InputDecoration(
-                  hintText: '0 ₫',
+                  hintText: '0',
+                  suffixText: '₫',
+                  suffixStyle: context.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: category.color.withOpacity(0.7),
+                  ),
                   hintStyle: context.textTheme.bodySmall?.copyWith(
                     color: context.colorScheme.onSurface.withOpacity(0.3),
                   ),
                   border: InputBorder.none,
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 8,
-                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
                 ),
               ),
             ),
+            const Gap(8), // Add some spacing before the switch
           ],
 
           // Toggle switch
@@ -623,14 +625,12 @@ class _BudgetScreenState extends State<BudgetScreen>
           colors: context.isDarkMode
               ? [
                   const Color(0xFF1E293B),
-                  const Color(0xFF1E293B).withOpacity(0.8)
+                  const Color(0xFF1E293B).withOpacity(0.8),
                 ]
               : [const Color(0xFFFFF7ED), const Color(0xFFFEF3C7)],
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: const Color(0xFFF59E0B).withOpacity(0.2),
-        ),
+        border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

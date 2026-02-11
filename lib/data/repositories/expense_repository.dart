@@ -1,38 +1,36 @@
 import '../models/expense_model.dart';
-import '../datasources/remote/expense_remote_datasource.dart';
+import '../datasources/local/expense_local_datasource.dart';
 
 /// Repository for managing expense data.
-/// Now connects to the Remote Data Source (Local Server API).
+/// Now connects to the Local Data Source (SharedPreferences).
 class ExpenseRepository {
-  final ExpenseRemoteDataSource _remoteDataSource = ExpenseRemoteDataSource();
+  final ExpenseLocalDataSource _localDataSource = ExpenseLocalDataSource();
 
   // In-memory cache or sync mechanism could be added here later.
 
-  /// Get all expenses from API
+  /// Get all expenses from Local Storage
   Future<List<ExpenseModel>> getAllExpenses() async {
     try {
-      return await _remoteDataSource.getAllExpenses();
+      return await _localDataSource.getAllExpenses();
     } catch (e) {
-      // Handle network errors gracefully (e.g., return empty list or cached data)
-      // For now, rethrow or return empty list
-      print('Error fetching expenses: $e');
+      print('Error fetching expenses locally: $e');
       return [];
     }
   }
 
-  /// Add a new expense via API
+  /// Add a new expense locally
   Future<void> addExpense(ExpenseModel expense) async {
-    await _remoteDataSource.addExpense(expense);
+    await _localDataSource.addExpense(expense);
   }
 
-  /// Update an expense via API
+  /// Update an expense locally
   Future<void> updateExpense(ExpenseModel expense) async {
-    await _remoteDataSource.updateExpense(expense);
+    await _localDataSource.updateExpense(expense);
   }
 
-  /// Delete an expense via API
+  /// Delete an expense locally
   Future<void> deleteExpense(String id) async {
-    await _remoteDataSource.deleteExpense(id);
+    await _localDataSource.deleteExpense(id);
   }
 
   // --- Filtering Logic (Client-side for now, or Server-side query params) ---
