@@ -376,39 +376,48 @@ class _ExpenseListScreenState extends State<ExpenseListScreen>
           tabs: [
             Tab(
               height: 38,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.list_rounded, size: 16),
-                  const Gap(4),
-                  Text('Tất cả (${_allExpenses.length})'),
-                ],
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.list_rounded, size: 16),
+                    const Gap(4),
+                    Text('Tất cả (${_allExpenses.length})'),
+                  ],
+                ),
               ),
             ),
             Tab(
               height: 38,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.arrow_upward_rounded, size: 16),
-                  const Gap(4),
-                  Text(
-                    'Chi (${_allExpenses.where((e) => e.type == TransactionType.expense).length})',
-                  ),
-                ],
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.arrow_upward_rounded, size: 16),
+                    const Gap(4),
+                    Text(
+                      'Chi (${_allExpenses.where((e) => e.type == TransactionType.expense).length})',
+                    ),
+                  ],
+                ),
               ),
             ),
             Tab(
               height: 38,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.arrow_downward_rounded, size: 16),
-                  const Gap(4),
-                  Text(
-                    'Thu (${_allExpenses.where((e) => e.type == TransactionType.income).length})',
-                  ),
-                ],
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.arrow_downward_rounded, size: 16),
+                    const Gap(4),
+                    Text(
+                      'Thu (${_allExpenses.where((e) => e.type == TransactionType.income).length})',
+                    ),
+                  ],
+                ),
               ),
             ),
           ],

@@ -5,11 +5,15 @@ import 'package:gap/gap.dart';
 import '../../../app/routes/route_names.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/extensions/context_extensions.dart';
+import '../../../data/models/bank_notification_model.dart';
 import '../../../data/models/expense_model.dart';
 import '../../../data/repositories/expense_repository.dart';
+import '../../../data/services/auto_expense_service.dart';
+import '../../../data/services/local_storage_service.dart';
 import '../../../data/services/budget_service.dart';
 import '../../budget/widgets/budget_progress_card.dart';
 import '../widgets/balance_card.dart';
+import '../widgets/notification_bottom_sheet.dart';
 import '../widgets/quick_shortcuts.dart';
 import '../widgets/recent_transactions_list.dart';
 
@@ -26,6 +30,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final BudgetService _budgetService = BudgetService();
   List<ExpenseModel> _expenses = [];
   BudgetProgress? _budgetProgress;
+  double _currentBalance = 0;
   bool _isLoading = true;
   int _currentNavIndex = 0;
 
@@ -47,10 +52,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         expenses: expenses,
       );
 
+      // Initialize AutoExpenseService if needed
+      await AutoExpenseService.getInstance();
+      
+      final storage = await LocalStorageService.getInstance();
+      final currentBalance = storage.getTotalBalance();
+
       if (mounted) {
         setState(() {
           _expenses = expenses;
           _budgetProgress = budgetProgress;
+          _currentBalance = currentBalance;
           _isLoading = false;
         });
       }
@@ -136,51 +148,178 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               .fade(duration: 500.ms)
               .slideX(begin: -0.1, end: 0, curve: Curves.easeOutCubic),
 
-          // Profile + Notification
-          Row(
-            children: [
-              _buildHeaderIconButton(
-                context,
-                icon: Icons.notifications_none_rounded,
-                onTap: () {},
-              ),
-            ],
+          // Notification Bell
+          StreamBuilder<BankNotificationModel>(
+            stream: AutoExpenseService.instance?.notificationStream,
+            builder: (context, snapshot) {
+              final pendingCount =
+                  AutoExpenseService.instance?.pendingNotifications.length ?? 0;
+              
+              return _buildNotificationIcon(context, pendingCount);
+            },
           ).animate().fade(duration: 500.ms, delay: 100.ms),
         ],
       ),
     );
   }
 
-  Widget _buildHeaderIconButton(
-    BuildContext context, {
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildNotificationIcon(BuildContext context, int pendingCount) {
+    final bool hasNotifications = pendingCount > 0;
+
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
-        onTap();
+        showNotificationBottomSheet(context).then((shouldNavigate) {
+          if (shouldNavigate) {
+            context.pushNamed(RouteNames.autoExpense).then((_) {
+              _loadExpenses();
+              setState(() {}); // Refresh notification badge
+            });
+          }
+        });
       },
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: context.isDarkMode
-              ? context.theme.cardTheme.color
-              : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(context.isDarkMode ? 0.15 : 0.06),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Outer glow ring (visible when has notifications)
+          if (hasNotifications)
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.25),
+                      blurRadius: 12,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+              )
+                  .animate(onPlay: (c) => c.repeat(reverse: true))
+                  .fade(
+                    begin: 0.5,
+                    end: 1.0,
+                    duration: 1500.ms,
+                    curve: Curves.easeInOut,
+                  ),
             ),
-          ],
-        ),
-        child: Icon(
-          icon,
-          size: 22,
-          color: context.colorScheme.onSurface.withOpacity(0.7),
-        ),
+
+          // Main icon container
+          Container(
+            padding: const EdgeInsets.all(11),
+            decoration: BoxDecoration(
+              color: hasNotifications
+                  ? (context.isDarkMode
+                      ? AppColors.primary.withOpacity(0.15)
+                      : AppColors.primary.withOpacity(0.08))
+                  : (context.isDarkMode
+                      ? context.theme.cardTheme.color
+                      : Colors.white),
+              borderRadius: BorderRadius.circular(14),
+              border: hasNotifications
+                  ? Border.all(
+                      color: AppColors.primary.withOpacity(0.3),
+                      width: 1.5,
+                    )
+                  : null,
+              boxShadow: [
+                BoxShadow(
+                  color: hasNotifications
+                      ? AppColors.primary.withOpacity(0.15)
+                      : Colors.black.withOpacity(context.isDarkMode ? 0.15 : 0.06),
+                  blurRadius: hasNotifications ? 14 : 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Icon(
+              hasNotifications
+                  ? Icons.notifications_rounded
+                  : Icons.notifications_none_rounded,
+              size: 22,
+              color: hasNotifications
+                  ? AppColors.primary
+                  : context.colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ),
+
+          // Animated bell shake when has notifications
+          if (hasNotifications)
+            Positioned.fill(
+              child: Container(
+                padding: const EdgeInsets.all(11),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  Icons.notifications_rounded,
+                  size: 22,
+                  color: AppColors.primary,
+                ),
+              )
+                  .animate(
+                    onPlay: (c) => c.repeat(),
+                    delay: 2000.ms,
+                  )
+                  .shake(
+                    hz: 4,
+                    rotation: 0.08,
+                    duration: 600.ms,
+                  )
+                  .then(delay: 3000.ms),
+            ),
+
+          // Count Badge
+          if (hasNotifications)
+            Positioned(
+              top: -5,
+              right: -5,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFF6B6B), Color(0xFFEE5A24)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: context.isDarkMode
+                        ? AppColors.surfaceDark
+                        : Colors.white,
+                    width: 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFEE5A24).withOpacity(0.4),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Text(
+                    pendingCount > 9 ? '9+' : '$pendingCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      height: 1.1,
+                    ),
+                  ),
+                ),
+              )
+                  .animate()
+                  .scale(
+                    begin: const Offset(0, 0),
+                    end: const Offset(1, 1),
+                    duration: 400.ms,
+                    curve: Curves.elasticOut,
+                  ),
+            ),
+        ],
       ),
     );
   }
@@ -229,7 +368,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         children: [
           // Balance Card
           BalanceCard(
-            totalBalance: _totalIncome - _totalExpense,
+            totalBalance: _currentBalance != 0 ? _currentBalance : (_totalIncome - _totalExpense),
             totalIncome: _totalIncome,
             totalExpense: _totalExpense,
             monthLabel:
@@ -359,7 +498,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }) {
     final isActive = _currentNavIndex == index;
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
         HapticFeedback.lightImpact();
         setState(() => _currentNavIndex = index);
         switch (index) {
@@ -367,14 +506,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             // Already on home
             break;
           case 1:
-            context.pushNamed(RouteNames.expenseList);
+            await context.pushNamed(RouteNames.expenseList);
             break;
           case 2:
-            context.pushNamed(RouteNames.statistics);
+            await context.pushNamed(RouteNames.statistics);
             break;
           case 3:
-            context.pushNamed(RouteNames.settings);
+            await context.pushNamed(RouteNames.settings);
             break;
+        }
+        
+        // Reset to Home tab when returning
+        if (mounted && index != 0) {
+          setState(() => _currentNavIndex = 0);
         }
       },
       behavior: HitTestBehavior.opaque,

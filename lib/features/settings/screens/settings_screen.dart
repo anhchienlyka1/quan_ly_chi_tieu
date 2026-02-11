@@ -141,13 +141,12 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                                 label: 'Ghi chi tiêu tự động',
                                 subtitle: 'Từ thông báo ngân hàng',
                                 iconColor: const Color(0xFFEC4899),
-                                trailing: _buildModernSwitch(
-                                  value: false,
-                                  onChanged: (value) {
-                                    context.showSnackBar('Chức năng này sẽ sớm ra mắt trong tương lai!');
-                                  },
-                                  activeColor: const Color(0xFFEC4899),
+                                trailing: const Icon(
+                                  Icons.arrow_forward_ios_rounded,
+                                  size: 16,
+                                  color: Colors.grey,
                                 ),
+                                onTap: () => context.pushNamed(RouteNames.autoExpense),
                               ),
                               _buildDivider(context),
                               

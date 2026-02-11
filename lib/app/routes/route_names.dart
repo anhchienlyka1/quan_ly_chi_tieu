@@ -11,4 +11,5 @@ class RouteNames {
   static const String expenseDetail = '/expense-detail';
   static const String scanReceipt = '/scan-receipt';
   static const String budget = '/budget';
+  static const String autoExpense = '/auto-expense';
 }
