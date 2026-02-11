@@ -227,14 +227,8 @@ class _BudgetScreenState extends State<BudgetScreen>
                 padding: const EdgeInsets.fromLTRB(8, 8, 24, 40),
                 child: Row(
                   children: [
-                    // Back button
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(
-                        Icons.arrow_back_ios_rounded,
-                        color: Colors.white,
-                      ),
-                    ),
+                    // Back button removed
+                    const Gap(16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

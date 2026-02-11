@@ -39,6 +39,66 @@
       "note": null,
       "createdAt": "2026-02-10T17:02:15.419790",
       "type": "income"
+    },
+    {
+      "id": null,
+      "title": "Giao dịch không xác định",
+      "amount": 500000,
+      "category": "other",
+      "date": "2026-02-11T16:24:58.520573",
+      "note": "Tự động ghi từ VietinBank\nNội dung: Nguoi giau giau ten chuyen khoan",
+      "createdAt": "2026-02-11T17:26:46.002102",
+      "type": "income"
+    },
+    {
+      "id": null,
+      "title": "Haidilao Hotpot",
+      "amount": 1250000,
+      "category": "food",
+      "date": "2026-02-11T12:24:58.520542",
+      "note": "Tự động ghi từ Vietcombank\nNội dung: HAIDILAO HOTPOT",
+      "createdAt": "2026-02-11T17:27:06.983580",
+      "type": "expense"
+    },
+    {
+      "id": null,
+      "title": "Grab Car",
+      "amount": 85000,
+      "category": "transport",
+      "date": "2026-02-11T05:24:58.520558",
+      "note": "Tự động ghi từ Momo\nNội dung: Thanh toan Grab chuyen 123",
+      "createdAt": "2026-02-11T17:27:28.417135",
+      "type": "expense"
+    },
+    {
+      "id": null,
+      "title": "Lương tháng 1",
+      "amount": 35000000,
+      "category": "salary",
+      "date": "2026-02-11T15:24:58.520426",
+      "note": "Tự động ghi từ Techcombank\nNội dung: LUONG THANG 01",
+      "createdAt": "2026-02-11T17:35:35.452067",
+      "type": "income"
+    },
+    {
+      "id": null,
+      "title": "Giao dịch không xác định",
+      "amount": 500000,
+      "category": "other",
+      "date": "2026-02-11T16:24:58.520573",
+      "note": "Tự động ghi từ VietinBankyyNội dung: Nguoi giau giau ten chuyen khoan",
+      "createdAt": "2026-02-11T17:26:46.002102",
+      "type": "income"
+    },
+    {
+      "id": null,
+      "title": "Lương tháng 1",
+      "amount": 35000000,
+      "category": "salary",
+      "date": "2026-02-11T15:24:58.520426",
+      "note": "Tự động ghi từ TechcombankNjội dung: LUONG THANG 01",
+      "createdAt": "2026-02-11T17:35:35.452067",
+      "type": "income"
     }
   ],
   "categories": [

@@ -93,9 +93,14 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       final cleanAmount = _amountController.text.replaceAll(RegExp(r'[^0-9]'), '');
       final amount = double.tryParse(cleanAmount) ?? 0;
       
+      final existingId = widget.expense?.id;
+      // Check if this is a mock/pending transaction that hasn't been synced to server yet
+      final isMockId = existingId != null && existingId.startsWith('mock_');
+
       // Create updated or new model
+      // If it's a mock ID, we clear it so the server assigns a new valid ID
       final expense = ExpenseModel(
-        id: widget.expense?.id, // Keep ID if editing
+        id: isMockId ? null : existingId,
         title: _titleController.text.trim(),
         amount: amount,
         category: _selectedCategory,
@@ -106,8 +111,29 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       );
 
       try {
-        if (_isEditing) {
-          await _repository.updateExpense(expense);
+        // If it's editing an existing valid expense, update it.
+        // If it's a mock expense or new, add it.
+        if (_isEditing && !isMockId) {
+          try {
+            await _repository.updateExpense(expense);
+          } catch (e) {
+            // If update fails because it's not found (404), try adding it as new
+            if (e.toString().contains('404') || e.toString().contains('Status code: 404')) {
+               // Create new expense without ID to force creation
+               final newExpense = ExpenseModel(
+                 title: expense.title,
+                 amount: expense.amount,
+                 category: expense.category,
+                 date: expense.date,
+                 note: expense.note,
+                 type: expense.type,
+                 createdAt: expense.createdAt,
+               );
+               await _repository.addExpense(newExpense);
+            } else {
+              rethrow;
+            }
+          }
         } else {
           await _repository.addExpense(expense);
         }
