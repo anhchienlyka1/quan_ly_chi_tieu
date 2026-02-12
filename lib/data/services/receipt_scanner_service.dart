@@ -164,7 +164,12 @@ class ReceiptScannerService {
   /// Scan a receipt image and extract expense data.
   /// [imageBytes] - raw bytes of the receipt image
   /// [mimeType] - MIME type (e.g. 'image/jpeg', 'image/png')
-  Future<ReceiptData> scanReceipt(Uint8List imageBytes, String mimeType) async {
+  /// [qrContent] - Optional QR code content detected locally
+  Future<ReceiptData> scanReceipt(
+    Uint8List imageBytes,
+    String mimeType, {
+    String? qrContent,
+  }) async {
     if (_model == null) {
       throw Exception(
         'Gemini API key chưa được cấu hình. '
@@ -174,6 +179,7 @@ class ReceiptScannerService {
 
     final prompt = TextPart('''
 Bạn là một trợ lý chuyên phân tích hóa đơn/biên lai mua hàng.
+${qrContent != null ? 'Tôi đã quét được mã QR trên ảnh với nội dung: "$qrContent". Hãy sử dụng thông tin này nếu hữu ích.' : ''}
 Hãy phân tích ảnh hóa đơn này và trả về dữ liệu JSON với cấu trúc chính xác như sau:
 
 {
@@ -195,6 +201,7 @@ Lưu ý quan trọng:
 - Category phải là MỘT trong các giá trị: food, transport, shopping, entertainment, health, education, bills, other
 - confidence là mức độ tự tin từ 0.0 đến 1.0
 - CHỈ trả về JSON, KHÔNG kèm thêm text hay giải thích
+- Nếu có mã QR chứa thông tin hóa đơn (như PDV, ký hiệu, số hóa đơn), hãy ưu tiên sử dụng thông tin đó để trích xuất chính xác hơn
 
 Chỉ trả về JSON object, không markdown, không code block.
 ''');
@@ -225,7 +232,13 @@ Chỉ trả về JSON object, không markdown, không code block.
       return ReceiptData.fromJson(json);
     } catch (e) {
       if (e is FormatException) {
-        throw Exception('Không thể phân tích dữ liệu hóa đơn. Hãy chụp lại ảnh rõ hơn.');
+        throw Exception('Không thể phân tích dữ liệu hóa đơn via AI. Vui lòng thử lại hoặc nhập thủ công.');
+      } else if (e.toString().contains('403') || e.toString().contains('401')) {
+        throw Exception('Lỗi xác thực API Key. Vui lòng kiểm tra lại cấu hình.');
+      } else if (e.toString().contains('503') || e.toString().contains('500')) {
+        throw Exception('Dịch vụ AI đang bận. Vui lòng thử lại sau.');
+      } else if (e.toString().contains('SocketException') || e.toString().contains('ClientException')) {
+        throw Exception('Không có kết nối mạng. Vui lòng kiểm tra internet.');
       }
       rethrow;
     }

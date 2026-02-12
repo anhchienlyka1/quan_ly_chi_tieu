@@ -66,4 +66,9 @@ class ExpenseLocalDataSource {
     );
     await prefs.setString(_storageKey, jsonString);
   }
+
+  Future<void> deleteAllData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_storageKey);
+  }
 }

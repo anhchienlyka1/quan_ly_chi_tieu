@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import '../../../app/routes/route_names.dart';
 import '../../../core/extensions/context_extensions.dart';
 import '../../../main.dart';
+import '../../../data/services/pin_service.dart';
+import '../../../data/repositories/expense_repository.dart';
+import 'package:gap/gap.dart';
+import 'package:flutter/services.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -176,6 +180,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                                   size: 16,
                                   color: context.colorScheme.error.withOpacity(0.5),
                                 ),
+                                onTap: _handleDeleteData,
                               ),
                               _buildDivider(context),
                               
@@ -503,6 +508,153 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _handleDeleteData() async {
+    final pinService = PinService();
+    final isPinSet = await pinService.isPinSet();
+
+    if (!mounted) return;
+
+    if (!isPinSet) {
+      // Step 1: Set PIN if not set
+      final newPin = await _showPinDialog(
+        context, 
+        title: 'Thiết lập mã PIN', 
+        subtitle: 'Bảo vệ dữ liệu của bạn',
+        isSetting: true
+      );
+      
+      if (newPin != null) {
+        await pinService.setPin(newPin);
+        if (!mounted) return;
+        _handleDeleteData(); // Retry with PIN set
+      }
+    } else {
+      // Step 2: Enter PIN
+      final enteredPin = await _showPinDialog(
+        context,
+        title: 'Nhập mã PIN',
+        subtitle: 'Xác nhận xóa dữ liệu',
+      );
+
+      if (enteredPin != null) {
+        final isValid = await pinService.verifyPin(enteredPin);
+        if (isValid) {
+          if (!mounted) return;
+          _showDeleteConfirmation(context);
+        } else {
+          if (!mounted) return;
+          context.showSnackBar('Mã PIN không đúng', isError: true);
+        }
+      }
+    }
+  }
+
+  Future<String?> _showPinDialog(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    bool isSetting = false,
+  }) {
+    String pin = '';
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            title: Column(
+              children: [
+                Icon(Icons.lock_rounded, size: 48, color: context.colorScheme.primary),
+                const Gap(16),
+                Text(title, style: context.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                const Gap(8),
+                Text(subtitle, style: context.textTheme.bodyMedium?.copyWith(color: Colors.grey)),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  autofocus: true,
+                  keyboardType: TextInputType.number,
+                  obscureText: true,
+                  maxLength: 4,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 24, letterSpacing: 8, fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
+                    hintText: '----',
+                    counterText: '',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  onChanged: (value) {
+                    pin = value;
+                    if (value.length == 4 && !isSetting) {
+                      Navigator.pop(ctx, value);
+                    }
+                  },
+                ),
+                if (isSetting) ...[
+                  const Gap(16),
+                  Text(
+                    'Hãy ghi nhớ mã PIN này để thực hiện các thao tác bảo mật sau này.',
+                    style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.error),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+              if (isSetting)
+                FilledButton(
+                  onPressed: () {
+                    if (pin.length == 4) Navigator.pop(ctx, pin);
+                  }, 
+                  child: const Text('Lưu')
+                ),
+            ],
+          );
+        }
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            const Gap(12),
+            const Text('Cảnh báo cuối cùng'),
+          ],
+        ),
+        content: const Text(
+          'Toàn bộ dữ liệu chi tiêu, danh mục và cài đặt sẽ bị xóa vĩnh viễn.\n\nHành động này KHÔNG THỂ hoàn tác.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await ExpenseRepository().deleteAllData(); // Need to ensure Repository is accessible or instantiated
+              if (context.mounted) {
+                context.showSnackBar('Đã xóa toàn bộ dữ liệu');
+                // Optional: Restart app or navigate to Intro
+                 Navigator.pushNamedAndRemoveUntil(context, RouteNames.home, (route) => false);
+              }
+            },
+            child: const Text('Xóa ngay'),
+          ),
+        ],
       ),
     );
   }

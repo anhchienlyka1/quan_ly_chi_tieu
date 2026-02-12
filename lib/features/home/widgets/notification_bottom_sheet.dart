@@ -8,31 +8,76 @@ import '../../../core/extensions/number_extensions.dart';
 import '../../../data/models/bank_notification_model.dart';
 import '../../../data/services/auto_expense_service.dart';
 
-/// Shows the notification bottom sheet modal (view-only).
-/// Returns true if the user navigated to the detail screen.
-Future<bool> showNotificationBottomSheet(BuildContext context) async {
+/// Shows the notification bottom sheet modal.
+Future<bool> showNotificationBottomSheet(
+    BuildContext context, {
+    VoidCallback? onTransactionProcessed,
+  }) async {
   final result = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     barrierColor: Colors.black.withOpacity(0.5),
-    builder: (context) => const _NotificationBottomSheet(),
+    builder: (context) => _NotificationBottomSheet(
+      onTransactionProcessed: onTransactionProcessed,
+    ),
   );
   return result ?? false;
 }
 
-class _NotificationBottomSheet extends StatelessWidget {
-  const _NotificationBottomSheet();
+class _NotificationBottomSheet extends StatefulWidget {
+  final VoidCallback? onTransactionProcessed;
+  const _NotificationBottomSheet({this.onTransactionProcessed});
+
+  @override
+  State<_NotificationBottomSheet> createState() => _NotificationBottomSheetState();
+}
+
+class _NotificationBottomSheetState extends State<_NotificationBottomSheet> {
+  late List<BankNotificationModel> _pending;
+  late List<BankNotificationModel> _recorded;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshData();
+  }
+
+  void _refreshData() {
+    final service = AutoExpenseService.instance;
+    setState(() {
+      _pending = List.from(service?.pendingNotifications ?? []);
+      _recorded = (service?.allNotifications ?? [])
+          .where((n) => n.isAutoRecorded)
+          .toList();
+    });
+  }
+
+  Future<void> _handleAccept(BankNotificationModel item) async {
+    final service = AutoExpenseService.instance;
+    if (service != null) {
+      final success = await service.acceptTransaction(item.id);
+      if (success && mounted) {
+        HapticFeedback.mediumImpact();
+        widget.onTransactionProcessed?.call();
+        _refreshData();
+      }
+    }
+  }
+
+  void _handleReject(BankNotificationModel item) {
+    final service = AutoExpenseService.instance;
+    if (service != null) {
+      HapticFeedback.lightImpact();
+      service.rejectTransaction(item.id);
+      widget.onTransactionProcessed?.call();
+      _refreshData();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final service = AutoExpenseService.instance;
-    final pending = service?.pendingNotifications ?? [];
-    final recorded = (service?.allNotifications ?? [])
-        .where((n) => n.isAutoRecorded)
-        .toList();
-    final allItems = service?.allNotifications ?? [];
-    final maxHeight = context.screenHeight * 0.7;
+    final maxHeight = context.screenHeight * 0.85;
 
     return Container(
       constraints: BoxConstraints(maxHeight: maxHeight),
@@ -56,7 +101,7 @@ class _NotificationBottomSheet extends StatelessWidget {
           _buildDragHandle(context),
 
           // Header
-          _buildSheetHeader(context, pending.length),
+          _buildSheetHeader(context, _pending.length),
 
           // Divider
           Divider(
@@ -66,13 +111,14 @@ class _NotificationBottomSheet extends StatelessWidget {
 
           // Content
           Flexible(
-            child: allItems.isEmpty
+            child: (_pending.isEmpty && _recorded.isEmpty)
                 ? _buildEmptyState(context)
-                : _buildNotificationList(context, pending, recorded),
+                : _buildNotificationList(context),
           ),
 
-          // Footer: navigate to detail screen
-          if (pending.isNotEmpty) _buildFooterAction(context),
+          // Footer
+          if (_pending.isNotEmpty || _recorded.isNotEmpty) 
+            _buildFooterAction(context),
         ],
       ),
     )
@@ -126,7 +172,7 @@ class _NotificationBottomSheet extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Đồng bộ chi tiêu',
+                  'Giao dịch chờ duyệt',
                   style: context.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -134,8 +180,8 @@ class _NotificationBottomSheet extends StatelessWidget {
                 const Gap(2),
                 Text(
                   pendingCount > 0
-                      ? '$pendingCount giao dịch chờ xác nhận'
-                      : 'Không có giao dịch mới',
+                      ? 'Bạn có $pendingCount giao dịch cần xử lý'
+                      : 'Đã xử lý hết các giao dịch mới',
                   style: context.textTheme.bodySmall?.copyWith(
                     color: pendingCount > 0
                         ? AppColors.warning
@@ -165,7 +211,7 @@ class _NotificationBottomSheet extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              Icons.notifications_off_outlined,
+              Icons.check_circle_outline_rounded,
               size: 48,
               color: AppColors.primary.withOpacity(0.4),
             ),
@@ -179,7 +225,7 @@ class _NotificationBottomSheet extends StatelessWidget {
               ),
           const Gap(20),
           Text(
-            'Chưa có thông báo',
+            'Không có giao dịch mới',
             style: context.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w600,
               color: context.colorScheme.onSurface.withOpacity(0.6),
@@ -187,7 +233,7 @@ class _NotificationBottomSheet extends StatelessWidget {
           ),
           const Gap(8),
           Text(
-            'Thông báo từ ngân hàng sẽ hiện ở đây\nkhi bật tính năng ghi chi tiêu tự động',
+            'Tuyệt vời! Bạn đã xử lý hết các thông báo\ngiao dịch từ ngân hàng.',
             textAlign: TextAlign.center,
             style: context.textTheme.bodySmall?.copyWith(
               color: context.colorScheme.onSurface.withOpacity(0.4),
@@ -199,27 +245,19 @@ class _NotificationBottomSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildNotificationList(
-    BuildContext context,
-    List<BankNotificationModel> pending,
-    List<BankNotificationModel> recorded,
-  ) {
+  Widget _buildNotificationList(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
       shrinkWrap: true,
       children: [
         // Pending section
-        if (pending.isNotEmpty) ...[
-          _buildSectionLabel(
-              context, 'Chờ xác nhận', pending.length, const Color(0xFFF59E0B)),
-          const Gap(10),
-          ...pending.asMap().entries.map((entry) {
+        if (_pending.isNotEmpty) ...[
+          ..._pending.asMap().entries.map((entry) {
             return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _buildNotificationCard(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: _buildPendingCard(
                 context,
                 entry.value,
-                isPending: true,
               )
                   .animate(delay: Duration(milliseconds: 50 * entry.key))
                   .fade()
@@ -229,23 +267,22 @@ class _NotificationBottomSheet extends StatelessWidget {
         ],
 
         // Recorded section
-        if (recorded.isNotEmpty) ...[
+        if (_recorded.isNotEmpty) ...[
           const Gap(12),
-          _buildSectionLabel(context, 'Đã ghi nhận', recorded.length,
+          _buildSectionLabel(context, 'Lịch sử gần đây', _recorded.length,
               const Color(0xFF10B981)),
           const Gap(10),
-          ...recorded.take(5).toList().asMap().entries.map((entry) {
+          ..._recorded.take(5).toList().asMap().entries.map((entry) {
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: _buildNotificationCard(
+              child: _buildRecordedCard(
                 context,
                 entry.value,
-                isPending: false,
               )
                   .animate(
                       delay: Duration(
                           milliseconds:
-                              (50 * (entry.key + pending.length)).toInt()))
+                              (50 * (entry.key + _pending.length)).toInt()))
                   .fade()
                   .slideX(begin: 0.05, end: 0),
             );
@@ -281,199 +318,387 @@ class _NotificationBottomSheet extends StatelessWidget {
             letterSpacing: 0.5,
           ),
         ),
-        const Gap(8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            '$count',
-            style: TextStyle(
-              color: color,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
       ],
     );
   }
 
-  /// View-only notification card — no approve/reject buttons.
-  Widget _buildNotificationCard(
-    BuildContext context,
-    BankNotificationModel notification, {
-    required bool isPending,
-  }) {
+  /// New Designed Card for Pending Transactions
+  Widget _buildPendingCard(BuildContext context, BankNotificationModel notification) {
     final isIncome = notification.isIncoming;
-    final amountColor = isPending
-        ? (isIncome ? const Color(0xFF10B981) : AppColors.error)
-        : (isIncome
-            ? const Color(0xFF10B981).withOpacity(0.7)
-            : AppColors.error.withOpacity(0.7));
+    final amountColor = isIncome ? const Color(0xFF10B981) : AppColors.error;
     final amountPrefix = isIncome ? '+' : '-';
+    final category = notification.category;
 
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        Navigator.of(context).pop(true); // Close and signal to navigate
-      },
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: context.isDarkMode
-              ? Colors.white.withOpacity(isPending ? 0.05 : 0.03)
-              : Colors.grey.withOpacity(isPending ? 0.04 : 0.03),
-          borderRadius: BorderRadius.circular(14),
-          border: isPending
-              ? Border.all(
-                  color: const Color(0xFFF59E0B).withOpacity(0.2),
-                  width: 1,
-                )
-              : null,
+    return Container(
+      decoration: BoxDecoration(
+        color: context.isDarkMode ? const Color(0xFF252540) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: AppColors.primary.withOpacity(0.1),
+          width: 1.5,
         ),
-        child: Row(
-          children: [
-            // Status icon
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: isPending
-                    ? const Color(0xFFF59E0B).withOpacity(0.1)
-                    : const Color(0xFF10B981).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                isPending
-                    ? Icons.schedule_rounded
-                    : Icons.check_circle_rounded,
-                size: 18,
-                color: isPending
-                    ? const Color(0xFFF59E0B)
-                    : const Color(0xFF10B981),
-              ),
-            ),
-            const Gap(12),
-            // Info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title
-                  Text(
-                    notification.parsedTitle.isNotEmpty
-                        ? notification.parsedTitle
-                        : notification.rawContent,
-                    style: context.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                      color: isPending
-                          ? null
-                          : context.colorScheme.onSurface.withOpacity(0.6),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Header: Icon - Title - Amount
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Category Icon
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: category.color.withOpacity(0.1),
+                    shape: BoxShape.circle,
                   ),
-                  const Gap(4),
-                  // Bank + category + time (Wrap to avoid overflow)
-                  Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 6,
-                    runSpacing: 2,
+                  child: Icon(
+                    category.icon,
+                    size: 20,
+                    color: category.color,
+                  ),
+                ),
+                const Gap(12),
+                // Title & Time column
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        notification.bankName,
-                        style: context.textTheme.bodySmall?.copyWith(
-                          color: context.colorScheme.onSurface.withOpacity(0.5),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
+                        isIncome ? 'Nhận tiền' : 'Chuyển tiền',
+                        style: context.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
                         ),
                       ),
-                      Container(
-                        width: 3,
-                        height: 3,
-                        decoration: BoxDecoration(
-                          color:
-                              context.colorScheme.onSurface.withOpacity(0.25),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
+                      const Gap(2),
                       Row(
-                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            notification.category.icon,
-                            size: 11,
-                            color: notification.category.color.withOpacity(0.8),
+                            Icons.access_time_rounded,
+                            size: 10,
+                            color: context.colorScheme.onSurface.withOpacity(0.5),
                           ),
-                          const Gap(3),
+                          const Gap(4),
                           Text(
-                            notification.category.label,
-                            style: TextStyle(
-                              color: notification.category.color.withOpacity(0.8),
+                            _formatTime(notification.timestamp),
+                            style: context.textTheme.bodySmall?.copyWith(
                               fontSize: 11,
-                              fontWeight: FontWeight.w600,
+                              color: context.colorScheme.onSurface.withOpacity(0.5),
                             ),
                           ),
                         ],
                       ),
-                      Container(
-                        width: 3,
-                        height: 3,
-                        decoration: BoxDecoration(
-                          color:
-                              context.colorScheme.onSurface.withOpacity(0.25),
-                          shape: BoxShape.circle,
+                    ],
+                  ),
+                ),
+                // Amount
+                Text(
+                  '$amountPrefix${notification.amount.toCompactCurrency}',
+                  style: context.textTheme.titleMedium?.copyWith(
+                    color: amountColor,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Divider
+          Divider(
+            height: 1,
+            color: context.colorScheme.onSurface.withOpacity(0.05),
+            indent: 16,
+            endIndent: 16,
+          ),
+
+          // 2. Details Section
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                // Bank
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: context.colorScheme.onSurface.withOpacity(0.03),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.account_balance_rounded,
+                        size: 16,
+                        color: context.colorScheme.onSurface.withOpacity(0.6),
+                      ),
+                    ),
+                    const Gap(10),
+                    Expanded(
+                      child: Text(
+                        notification.bankName,
+                        style: context.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
+                    ),
+                  ],
+                ),
+                const Gap(12),
+                
+                // Raw Content Box
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: context.colorScheme.onSurface.withOpacity(0.03),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: context.colorScheme.onSurface.withOpacity(0.05),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        _formatTime(notification.timestamp),
+                        'Nội dung giao dịch',
+                        style: context.textTheme.labelSmall?.copyWith(
+                           color: context.colorScheme.onSurface.withOpacity(0.5),
+                           fontSize: 10,
+                        ),
+                      ),
+                      const Gap(4),
+                      Text(
+                        notification.rawContent,
                         style: context.textTheme.bodySmall?.copyWith(
-                          color: context.colorScheme.onSurface.withOpacity(0.5),
-                          fontSize: 11,
+                          color: context.colorScheme.onSurface.withOpacity(0.8),
+                          fontStyle: FontStyle.italic,
+                          height: 1.4,
+                        ),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const Gap(12),
+
+                // AI Category Detection
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.primary.withOpacity(0.1),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.auto_awesome,
+                        size: 16,
+                        color: AppColors.primary,
+                      ),
+                      const Gap(8),
+                      Expanded(
+                        child: RichText(
+                          text: TextSpan(
+                            style: context.textTheme.bodySmall?.copyWith(
+                              color: context.colorScheme.onSurface,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: 'Loại giao dịch: ',
+                                style: TextStyle(
+                                  color: context.colorScheme.onSurface.withOpacity(0.6),
+                                ),
+                              ),
+                              TextSpan(
+                                text: category.label,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  
-                  // Transfer Content (Note)
-                  if (notification.rawContent.isNotEmpty && 
-                      notification.rawContent != notification.parsedTitle)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Text(
-                        '"${notification.rawContent}"',
-                        style: context.textTheme.bodySmall?.copyWith(
-                          color: context.colorScheme.onSurface.withOpacity(0.6),
-                          fontSize: 11,
-                          fontStyle: FontStyle.italic,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const Gap(8),
-            // Amount
-            Text(
-              '$amountPrefix${notification.amount.toCompactCurrency}',
-              style: context.textTheme.bodyMedium?.copyWith(
-                color: amountColor,
-                fontWeight: FontWeight.w800,
-                fontSize: 13,
-              ),
+          ),
+
+          // 3. Actions
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildActionButton(
+                    context,
+                    label: 'Từ chối',
+                    icon: Icons.close_rounded,
+                    color: AppColors.error,
+                    onTap: () => _handleReject(notification),
+                    isPrimary: false,
+                  ),
+                ),
+                const Gap(12),
+                Expanded(
+                  child: _buildActionButton(
+                    context,
+                    label: 'Chấp nhận',
+                    icon: Icons.check_rounded,
+                    color: const Color(0xFF10B981),
+                    onTap: () => _handleAccept(notification),
+                    isPrimary: true,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton(
+    BuildContext context, {
+    required String label,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    required bool isPrimary,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isPrimary ? color.withOpacity(0.1) : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isPrimary ? Colors.transparent : context.colorScheme.onSurface.withOpacity(0.1),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon, 
+                size: 18, 
+                color: isPrimary ? color : context.colorScheme.onSurface.withOpacity(0.6)
+              ),
+              const Gap(8),
+              Text(
+                label,
+                style: context.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: isPrimary ? color : context.colorScheme.onSurface.withOpacity(0.6),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  /// Footer with "Xem chi tiết" button to navigate to the full AutoExpense screen.
+  /// Compact card for history/recorded items
+  Widget _buildRecordedCard(
+    BuildContext context,
+    BankNotificationModel notification,
+  ) {
+    final isIncome = notification.isIncoming;
+    final amountColor = isIncome
+            ? const Color(0xFF10B981).withOpacity(0.7)
+            : AppColors.error.withOpacity(0.7);
+    final amountPrefix = isIncome ? '+' : '-';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.isDarkMode
+            ? Colors.white.withOpacity(0.03)
+            : Colors.grey.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          // Status icon
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF10B981).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.check_circle_rounded,
+              size: 18,
+              color: Color(0xFF10B981),
+            ),
+          ),
+          const Gap(12),
+          // Info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  notification.parsedTitle.isNotEmpty
+                      ? notification.parsedTitle
+                      : notification.rawContent,
+                  style: context.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: context.colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const Gap(4),
+                // Bank + time
+                Text(
+                  '${notification.bankName} • ${_formatTime(notification.timestamp)}',
+                  style: context.textTheme.bodySmall?.copyWith(
+                    color: context.colorScheme.onSurface.withOpacity(0.5),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Gap(8),
+          // Amount
+          Text(
+            '$amountPrefix${notification.amount.toCompactCurrency}',
+            style: context.textTheme.bodyMedium?.copyWith(
+              color: amountColor,
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFooterAction(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
@@ -488,39 +713,24 @@ class _NotificationBottomSheet extends StatelessWidget {
         top: false,
         child: SizedBox(
           width: double.infinity,
-          child: ElevatedButton(
+          child: TextButton(
             onPressed: () {
-              HapticFeedback.lightImpact();
-              // Close bottom sheet first, then navigate
               Navigator.of(context).pop(true);
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
+            style: TextButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-              elevation: 0,
+              foregroundColor: context.colorScheme.onSurface.withOpacity(0.6),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.open_in_new_rounded, size: 18),
-                Gap(8),
-                Text(
-                  'Xem chi tiết & xử lý',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
+            child: Text(
+              'Xem tất cả lịch sử',
+              style: context.textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),
       ),
-    ).animate().fade(delay: 200.ms, duration: 300.ms);
+    );
   }
 
   String _formatTime(DateTime time) {

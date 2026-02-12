@@ -42,11 +42,12 @@ class AutoExpenseService {
     _storage = await LocalStorageService.getInstance();
     _categorizer = await TransactionCategorizerService.getInstance();
     _loadHistory();
+    
+    // Remove any legacy mock data that might be persisted
+    _pendingNotifications.removeWhere((n) => n.id.startsWith('mock_'));
+    _saveHistory();
 
-    // MOCK DATA: Generate sample data if empty to demonstrate UI
-    if (_pendingNotifications.isEmpty) {
-      _generateMockData();
-    }
+
 
     // Auto-start if enabled (only on Android)
     if (!kIsWeb && _storage?.isAutoExpenseEnabled() == true) {
@@ -157,11 +158,20 @@ class AutoExpenseService {
     final String title = event.title ?? '';
     final String content = event.content ?? '';
     
+    // DEBUG LOG: Print everything to debug
+    debugPrint('🔔 NO_FILTER: Notification received from: $packageName');
+    debugPrint('   Title: $title');
+    debugPrint('   Content: $content');
+
     // Bỏ qua nếu notification bị remove
     if (event.hasRemoved == true) return;
 
+    // Check if recognized as bank
+    final isBank = BankNotificationParser.isBankNotification(packageName);
+    debugPrint('   => Is recognized bank app? $isBank');
+
     // Chỉ xử lý notification từ app ngân hàng
-    if (!BankNotificationParser.isBankNotification(packageName)) return;
+    if (!isBank) return;
 
     debugPrint('🏦 Bank notification detected: $packageName');
     debugPrint('   Title: $title');
@@ -179,34 +189,48 @@ class AutoExpenseService {
       return;
     }
 
-    // AI categorize
-    try {
-      final result = await _categorizer!.categorize(
-        parsed.rawContent,
-        isIncoming: parsed.isIncoming,
-      );
+      // DUPLICATE CHECK: Prevent adding the same notification multiple times
+      // TPBank and some other apps fire multiple events for the same transaction.
+      final isDuplicate = _pendingNotifications.any((n) {
+        final timeDiff = n.timestamp.difference(parsed.timestamp).inSeconds.abs();
+        return n.amount == parsed.amount &&
+               n.isIncoming == parsed.isIncoming &&
+               timeDiff < 60; // Same amount & type within 60 seconds
+      });
 
-      final categoryStr = result['category'] ?? 'other';
-      final parsedTitle = result['title'] ?? parsed.rawContent;
+      if (isDuplicate) {
+        debugPrint('🚫 Duplicate notification detected, skipping: ${parsed.amount}');
+        return;
+      }
 
-      final categorized = parsed.copyWith(
-        parsedTitle: parsedTitle,
-        category: TransactionCategorizerService.mapCategory(
-          categoryStr,
-          parsed.isIncoming,
-        ),
-      );
+      // AI categorize
+      try {
+        final result = await _categorizer!.categorize(
+          parsed.rawContent,
+          isIncoming: parsed.isIncoming,
+        );
 
-      // Thêm vào danh sách chờ duyệt (KHÔNG tự động lưu)
-      _addToPending(categorized);
-    } catch (e) {
-      debugPrint('❌ Error processing bank notification: $e');
-      // Still add to pending with basic info
-      final basicCategorized = parsed.copyWith(
-        parsedTitle: parsed.rawContent,
-      );
-      _addToPending(basicCategorized);
-    }
+        final categoryStr = result['category'] ?? 'other';
+        final parsedTitle = result['title'] ?? parsed.rawContent;
+
+        final categorized = parsed.copyWith(
+          parsedTitle: parsedTitle,
+          category: TransactionCategorizerService.mapCategory(
+            categoryStr,
+            parsed.isIncoming,
+          ),
+        );
+
+        // Thêm vào danh sách chờ duyệt (KHÔNG tự động lưu)
+        _addToPending(categorized);
+      } catch (e) {
+        debugPrint('❌ Error processing bank notification: $e');
+        // Still add to pending with basic info
+        final basicCategorized = parsed.copyWith(
+          parsedTitle: parsed.rawContent,
+        );
+        _addToPending(basicCategorized);
+      }
   }
 
   /// Thêm vào danh sách chờ duyệt
@@ -309,91 +333,114 @@ class AutoExpenseService {
     }
   }
 
-  /// Generate mock data for demonstration
-  void _generateMockData() {
-    _pendingNotifications = [
-      // Pending 1: Salary
+
+
+  /// Generate mock data for testing UI
+  void generateMockData() {
+    final now = DateTime.now();
+    final mocks = [
       BankNotificationModel(
-        id: 'mock_1',
+        id: 'mock_${now.millisecondsSinceEpoch}_1',
+        bankName: 'Vietcombank',
+        packageName: 'com.VCB.MobileBanking',
+        amount: 15500000,
+        isIncoming: true,
+        rawContent: 'NHAN LUONG THANG 01/2026',
+        parsedTitle: 'Lương tháng 01/2026',
+        category: ExpenseCategory.salary,
+        timestamp: now.subtract(const Duration(minutes: 5)),
+      ),
+      BankNotificationModel(
+        id: 'mock_${now.millisecondsSinceEpoch}_2',
         bankName: 'Techcombank',
         packageName: 'com.techcombank.mobile',
-        amount: 35000000,
-        isIncoming: true,
-        rawContent: 'LUONG THANG 01', // Parsed content
-        parsedTitle: 'Lương tháng 1',
-        category: ExpenseCategory.salary,
-        timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-        isAutoRecorded: false,
-      ),
-      // Pending 2: Dinner
-      BankNotificationModel(
-        id: 'mock_2',
-        bankName: 'Vietcombank',
-        packageName: 'com.vietcombank.mobile',
-        amount: 1250000,
-        isIncoming: false,
-        rawContent: 'HAIDILAO HOTPOT',
-        parsedTitle: 'Haidilao Hotpot',
-        category: ExpenseCategory.food,
-        timestamp: DateTime.now().subtract(const Duration(hours: 5)),
-        isAutoRecorded: false,
-        balance: 5432000, // Simulate bank balance sync
-      ),
-      // Pending 3: Grab
-      BankNotificationModel(
-        id: 'mock_3',
-        bankName: 'Momo',
-        packageName: 'com.mservice.momotransfer',
-        amount: 85000,
-        isIncoming: false,
-        rawContent: 'Thanh toan Grab chuyen 123',
-        parsedTitle: 'Grab Car',
-        category: ExpenseCategory.transport,
-        timestamp: DateTime.now().subtract(const Duration(hours: 12)),
-        isAutoRecorded: false,
-      ),
-      // Pending 4: Unknown
-      BankNotificationModel(
-        id: 'mock_unknown',
-        bankName: 'VietinBank',
-        packageName: 'com.vietinbank.ipay',
-        amount: 500000,
-        isIncoming: true,
-        rawContent: 'Nguoi giau giau ten chuyen khoan',
-        parsedTitle: 'Giao dịch không xác định',
-        category: ExpenseCategory.other,
-        timestamp: DateTime.now().subtract(const Duration(hours: 1)),
-        isAutoRecorded: false,
-      ),
-      // Recorded 1: Coffee
-      BankNotificationModel(
-        id: 'mock_4',
-        bankName: 'TPBank',
-        packageName: 'com.tpb.mobile',
         amount: 55000,
         isIncoming: false,
-        rawContent: 'HIGHLANDS COFFEE',
-        parsedTitle: 'Highlands Coffee',
+        rawContent: 'Thanh toan HighLand Coffee Tai Ha Noi',
+        parsedTitle: 'Cafe Highland',
         category: ExpenseCategory.food,
-        timestamp: DateTime.now().subtract(const Duration(days: 1)),
-        isAutoRecorded: true,
+        timestamp: now.subtract(const Duration(hours: 1)),
       ),
-      // Recorded 2: Electricity Bill
       BankNotificationModel(
-        id: 'mock_5',
-        bankName: 'MB Bank',
-        packageName: 'com.mbmobile',
-        amount: 780000,
+        id: 'mock_${now.millisecondsSinceEpoch}_3',
+        bankName: 'TPBank',
+        packageName: 'com.tpb.mobile',
+        amount: 125000,
         isIncoming: false,
-        rawContent: 'Tien dien thang 1',
-        parsedTitle: 'Tiền điện tháng 1',
+        rawContent: 'Grab E-Wallet Nap tien chuyen di chuyen',
+        parsedTitle: 'Nạp tiền Grab',
+        category: ExpenseCategory.transport,
+        timestamp: now.subtract(const Duration(hours: 3)),
+      ),
+      BankNotificationModel(
+        id: 'mock_${now.millisecondsSinceEpoch}_4',
+        bankName: 'MB Bank',
+        packageName: 'com.mbbank.mobile',
+        amount: 2500000,
+        isIncoming: false,
+        rawContent: 'THANH TOAN TIEN DIEN KY 1/2026',
+        parsedTitle: 'Thanh toán tiền điện',
         category: ExpenseCategory.bills,
-        timestamp: DateTime.now().subtract(const Duration(days: 2)),
-        isAutoRecorded: true,
+        timestamp: now.subtract(const Duration(days: 1)),
+      ),
+      BankNotificationModel(
+        id: 'mock_${now.millisecondsSinceEpoch}_5',
+        bankName: 'VPBank',
+        packageName: 'com.vpbank.mobile',
+        amount: 850000,
+        isIncoming: false,
+        rawContent: 'Mua sam tai Shopee Don hang #123456',
+        parsedTitle: 'Mua sắm Shopee',
+        category: ExpenseCategory.shopping,
+        timestamp: now.subtract(const Duration(days: 2)),
+      ),
+      BankNotificationModel(
+        id: 'mock_${now.millisecondsSinceEpoch}_6',
+        bankName: 'ACB',
+        packageName: 'com.acb.mobile',
+        amount: 5000000,
+        isIncoming: true,
+        rawContent: 'BO ME CHUYEN TIEN TIEU VAT',
+        parsedTitle: 'Bố mẹ cho tiền',
+        category: ExpenseCategory.gift,
+        timestamp: now.subtract(const Duration(days: 3)),
+      ),
+      BankNotificationModel(
+        id: 'mock_${now.millisecondsSinceEpoch}_7',
+        bankName: 'VIB',
+        packageName: 'com.vib.mobile',
+        amount: 250000,
+        isIncoming: false,
+        rawContent: 'KHAM BENH TAI BENH VIEN THU CUC',
+        parsedTitle: 'Khám bệnh Thu Cúc',
+        category: ExpenseCategory.health,
+        timestamp: now.subtract(const Duration(days: 4)),
       ),
     ];
-    _notificationStreamController.add(_pendingNotifications.first); // Trigger UI update
-    debugPrint('✅ Mock data generated: ${_pendingNotifications.length} items');
+
+    // Clear old mock data if needed or just append
+    // _pendingNotifications.clear(); 
+    
+    // Add new mocks to the top
+    _pendingNotifications.insertAll(0, mocks);
+    
+    // Limit list size
+    if (_pendingNotifications.length > 50) {
+      _pendingNotifications = _pendingNotifications.sublist(0, 50);
+    }
+    
+    _saveHistory();
+    
+    // Notify listeners
+    // Note: Since we modified the list directly, we might need a way to notify the stream
+    // Since stream is for *new* items, we might just fire the last one to trigger update,
+    // or rely on UI calling setState when refreshing.
+    // However, the stream is `Stream<BankNotificationModel>`, so we can emit them.
+    for (var mock in mocks) {
+      _notificationStreamController.add(mock);
+    }
+
+    debugPrint('✅ Generated ${mocks.length} mock notifications');
   }
 
   /// Dispose resources

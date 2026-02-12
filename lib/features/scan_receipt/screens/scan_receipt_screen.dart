@@ -11,6 +11,8 @@ import '../../../core/extensions/number_extensions.dart';
 import '../../../data/models/expense_model.dart';
 import '../../../data/repositories/expense_repository.dart';
 import '../../../data/services/receipt_scanner_service.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import '../../../data/services/transaction_categorizer_service.dart';
 
 class ScanReceiptScreen extends StatefulWidget {
   const ScanReceiptScreen({super.key});
@@ -22,12 +24,14 @@ class ScanReceiptScreen extends StatefulWidget {
 class _ScanReceiptScreenState extends State<ScanReceiptScreen>
     with TickerProviderStateMixin {
   final ImagePicker _picker = ImagePicker();
+  final MobileScannerController _qrController = MobileScannerController();
   final ExpenseRepository _repository = ExpenseRepository();
 
   // State
   Uint8List? _imageBytes;
   String? _imageMimeType;
   ReceiptData? _receiptData;
+  String? _qrContent;
   bool _isScanning = false;
   bool _isSaving = false;
   String? _error;
@@ -62,6 +66,7 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
 
   @override
   void dispose() {
+    _qrController.dispose();
     _pulseController.dispose();
     _titleController.dispose();
     _amountController.dispose();
@@ -88,7 +93,21 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
         _imageMimeType = mimeType;
         _receiptData = null;
         _error = null;
+        _qrContent = null;
       });
+
+      // Detect QR Code locally
+      try {
+        final capture = await _qrController.analyzeImage(image.path);
+        if (capture != null && capture.barcodes.isNotEmpty) {
+          final qr = capture.barcodes.first;
+          if (qr.rawValue != null) {
+            setState(() => _qrContent = qr.rawValue);
+          }
+        }
+      } catch (e) {
+        debugPrint('QR Scan error: $e');
+      }
 
       // Automatically start scanning
       _scanReceipt();
@@ -119,6 +138,7 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
       final data = await _scanner!.scanReceipt(
         _imageBytes!,
         _imageMimeType ?? 'image/jpeg',
+        qrContent: _qrContent,
       );
 
       if (!mounted) return;
@@ -237,6 +257,13 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
                 setState(() {
                   _scanner = ReceiptScannerService(apiKey: key);
                 });
+                
+                // Refresh categorizer service too
+                try {
+                  final categorizer = await TransactionCategorizerService.getInstance();
+                  await categorizer.reinitialize();
+                } catch (_) {}
+
                 if (ctx.mounted) Navigator.pop(ctx);
                 if (_imageBytes != null) _scanReceipt();
               }
@@ -268,9 +295,98 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
             ? _buildPickerState(context)
             : _isScanning
                 ? _buildScanningState(context)
-                : _receiptData != null
-                    ? _buildResultState(context)
-                    : _buildPickerState(context),
+                : _error != null
+                    ? _buildErrorState(context)
+                    : _receiptData != null
+                        ? _buildResultState(context)
+                        : _buildPickerState(context),
+      ),
+    );
+  }
+
+  void _enterManually() {
+    setState(() {
+      _error = null;
+      _receiptData = ReceiptData(
+        title: 'Chi tiêu mới',
+        amount: 0,
+        category: 'other',
+        date: DateTime.now().toIso8601String(),
+        confidence: 0,
+      );
+      // Initialize controllers with defaults
+      _titleController.text = '';
+      _amountController.text = '';
+      _noteController.text = '';
+      _selectedCategory = ExpenseCategory.other;
+      _selectedDate = DateTime.now();
+    });
+  }
+
+  Widget _buildErrorState(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppColors.error.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.error_outline_rounded,
+                size: 64,
+                color: AppColors.error,
+              ),
+            ).animate().scale(curve: Curves.elasticOut, duration: 600.ms),
+            const Gap(24),
+            Text(
+              'Rất tiếc, đã có lỗi xảy ra!',
+              style: context.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ).animate(delay: 100.ms).fade().slideY(begin: 0.2),
+            const Gap(12),
+            Text(
+              _error ?? 'Không thể quét được hóa đơn.',
+              style: context.textTheme.bodyMedium?.copyWith(
+                color: context.colorScheme.onSurface.withOpacity(0.6),
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
+            ).animate(delay: 200.ms).fade().slideY(begin: 0.2),
+            const Gap(32),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildActionButton(
+                    context,
+                    label: 'Thử lại',
+                    icon: Icons.refresh_rounded,
+                    isOutlined: true,
+                    onTap: _scanReceipt,
+                  ),
+                ),
+              ],
+            ).animate(delay: 300.ms).fade().slideY(begin: 0.2),
+            const Gap(16),
+            TextButton(
+              onPressed: _enterManually,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Nhập thủ công'),
+                  const Gap(4),
+                  const Icon(Icons.arrow_forward_rounded, size: 16),
+                ],
+              ),
+            ).animate(delay: 400.ms).fade(),
+          ],
+        ),
       ),
     );
   }
@@ -321,7 +437,7 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
             ).animate(delay: 100.ms).fade().slideY(begin: 0.2),
             const Gap(8),
             Text(
-              'Chụp hoặc chọn ảnh hóa đơn, AI sẽ tự động\ntrích xuất thông tin chi tiêu cho bạn',
+              'Chụp hoặc chọn ảnh hóa đơn (có mã QR), AI sẽ tự động\ntrích xuất thông tin chi tiêu cho bạn',
               style: context.textTheme.bodyMedium?.copyWith(
                 color: context.colorScheme.onSurface.withOpacity(0.5),
                 height: 1.6,
@@ -511,7 +627,7 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
           const Gap(12),
           _buildTipItem(context, '📸', 'Chụp ảnh rõ nét, đủ sáng'),
           _buildTipItem(context, '📐', 'Đặt hóa đơn trên nền phẳng'),
-          _buildTipItem(context, '✂️', 'Chụp toàn bộ hóa đơn, đặc biệt tổng tiền'),
+          _buildTipItem(context, '✂️', 'Chụp toàn bộ hóa đơn, hoặc mã QR rõ ràng'),
         ],
       ),
     );
@@ -522,7 +638,8 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 14)),
+          Text(emoji,
+              style: context.textTheme.bodyLarge?.copyWith(fontSize: 14)),
           const Gap(10),
           Expanded(
             child: Text(
@@ -663,7 +780,7 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
             const Gap(20),
 
             // Confidence badge
-            if (_receiptData != null)
+            if (_receiptData != null && _receiptData!.confidence > 0)
               _buildConfidenceBadge(context)
                   .animate(delay: 100.ms)
                   .fade()
@@ -754,6 +871,7 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
                         _imageBytes = null;
                         _receiptData = null;
                         _error = null;
+                        _qrContent = null;
                       });
                     },
                   ),
@@ -1188,7 +1306,7 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
               )
             : Icon(icon, size: 18, color: Colors.white),
         label: Text(label,
-            style: const TextStyle(
+            style: context.textTheme.labelLarge?.copyWith(
                 color: Colors.white, fontWeight: FontWeight.w600)),
       ),
     );

@@ -59,4 +59,8 @@ class ExpenseRepository {
     final monthly = await getExpensesByMonth(year, month);
     return monthly.fold<double>(0.0, (sum, e) => sum + e.amount);
   }
+  /// Delete all data
+  Future<void> deleteAllData() async {
+    await _localDataSource.deleteAllData();
+  }
 }

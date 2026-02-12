@@ -8,7 +8,7 @@ import '../../../core/extensions/context_extensions.dart';
 import '../../../core/extensions/number_extensions.dart';
 import '../../../data/models/bank_notification_model.dart';
 import '../../../data/services/auto_expense_service.dart';
-
+import '../../../data/services/bank_notification_parser.dart';
 class AutoExpenseScreen extends StatefulWidget {
   const AutoExpenseScreen({super.key});
 
@@ -115,8 +115,7 @@ class _AutoExpenseScreenState extends State<AutoExpenseScreen>
                             if (!_hasPermission && _isEnabled)
                               _buildPermissionWarning(context),
                             const Gap(16),
-                            _buildHowItWorksCard(context),
-                            const Gap(24),
+                            // Removed HowItWorksCard as per user request
                             _buildSupportedBanksCard(context),
                             const Gap(24),
                             _buildRecentTransactionsSection(context),
@@ -611,19 +610,38 @@ class _AutoExpenseScreenState extends State<AutoExpenseScreen>
   }
 
   Widget _buildSupportedBanksCard(BuildContext context) {
-    final banks = [
-      _BankInfo('Vietcombank', const Color(0xFF006A4E)),
-      _BankInfo('BIDV', const Color(0xFF0051A5)),
-      _BankInfo('VietinBank', const Color(0xFF003DA5)),
-      _BankInfo('Techcombank', const Color(0xFFE4002B)),
-      _BankInfo('MB Bank', const Color(0xFF0066B3)),
-      _BankInfo('TPBank', const Color(0xFF6E2C8B)),
-      _BankInfo('ACB', const Color(0xFF005BA1)),
-      _BankInfo('Sacombank', const Color(0xFF0055A4)),
-      _BankInfo('VPBank', const Color(0xFF006B3F)),
-      _BankInfo('Momo', const Color(0xFFAE2070)),
-      _BankInfo('ZaloPay', const Color(0xFF008FE5)),
-    ];
+    // Get unique bank names from parser
+    final uniqueBanks = BankNotificationParser.bankPackages.values.toSet().toList();
+    uniqueBanks.sort(); // Sort alphabetically
+
+    // Color mapping for known banks
+    final Map<String, Color> bankColors = {
+      'Vietcombank': const Color(0xFF006A4E),
+      'BIDV': const Color(0xFF0051A5),
+      'VietinBank': const Color(0xFF003DA5),
+      'Techcombank': const Color(0xFFE4002B),
+      'MB Bank': const Color(0xFF0066B3),
+      'TPBank': const Color(0xFF6E2C8B),
+      'ACB': const Color(0xFF005BA1),
+      'Sacombank': const Color(0xFF0055A4),
+      'VPBank': const Color(0xFF006B3F),
+      'VIB': const Color(0xFF0066B3), // VIB Blue
+      'Momo': const Color(0xFFAE2070),
+      'ZaloPay': const Color(0xFF008FE5),
+    };
+
+    // Helper to get color
+    Color getBankColor(String name) {
+      if (bankColors.containsKey(name)) return bankColors[name]!;
+      // Fallback: generate color from hash
+      final colors = [
+        Colors.blue, Colors.green, Colors.purple, Colors.orange, Colors.teal,
+        Colors.indigo, Colors.pink, Colors.cyan
+      ];
+      return colors[name.hashCode.abs() % colors.length];
+    }
+
+    final banks = uniqueBanks.map((name) => _BankInfo(name, getBankColor(name))).toList();
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -677,7 +695,7 @@ class _AutoExpenseScreenState extends State<AutoExpenseScreen>
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  '${banks.length} ngân hàng',
+                  '${banks.length} apps',
                   style: context.textTheme.bodySmall?.copyWith(
                     color: const Color(0xFF10B981),
                     fontWeight: FontWeight.w600,
