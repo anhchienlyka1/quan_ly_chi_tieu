@@ -322,300 +322,196 @@ class _NotificationBottomSheetState extends State<_NotificationBottomSheet> {
     );
   }
 
-  /// New Designed Card for Pending Transactions
+  /// Compact Card for Pending Transactions (from Auto Expense Screen)
   Widget _buildPendingCard(BuildContext context, BankNotificationModel notification) {
-    final isIncome = notification.isIncoming;
-    final amountColor = isIncome ? const Color(0xFF10B981) : AppColors.error;
-    final amountPrefix = isIncome ? '+' : '-';
-    final category = notification.category;
+    final isIncoming = notification.isIncoming;
+    final accentColor = isIncoming
+        ? const Color(0xFF10B981)
+        : const Color(0xFFEF4444);
 
     return Container(
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: context.isDarkMode ? const Color(0xFF252540) : Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppColors.primary.withOpacity(0.1),
+          color: const Color(0xFFF59E0B).withOpacity(0.3),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: context.isDarkMode
+                ? Colors.black.withOpacity(0.2)
+                : const Color(0xFFF59E0B).withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Header: Icon - Title - Amount
-          Padding(
-            padding: const EdgeInsets.all(16),
+          Row(
+            children: [
+              // Category icon
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: notification.category.color.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  notification.category.icon,
+                  color: notification.category.color,
+                  size: 20,
+                ),
+              ),
+              const Gap(12),
+              // Info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      notification.parsedTitle.isNotEmpty
+                          ? notification.parsedTitle
+                          : notification.rawContent,
+                      style: context.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const Gap(4),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: notification.category.color.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            notification.category.label,
+                            style: context.textTheme.bodySmall?.copyWith(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: notification.category.color,
+                            ),
+                          ),
+                        ),
+                        const Gap(6),
+                        Icon(
+                          Icons.account_balance_rounded,
+                          size: 11,
+                          color: context.colorScheme.onSurface.withOpacity(0.3),
+                        ),
+                        const Gap(3),
+                        Text(
+                          notification.bankName,
+                          style: context.textTheme.bodySmall?.copyWith(
+                            fontSize: 10,
+                            color: context.colorScheme.onSurface.withOpacity(0.4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const Gap(6),
+              // Amount
+              Text(
+                '${isIncoming ? '+' : '-'}${notification.amount.toCurrency}',
+                style: context.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: accentColor,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+          const Gap(10),
+          // Accept/Reject buttons
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            decoration: BoxDecoration(
+              color: context.isDarkMode
+                  ? Colors.white.withOpacity(0.03)
+                  : Colors.grey.withOpacity(0.04),
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Row(
               children: [
-                // Category Icon
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: category.color.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    category.icon,
-                    size: 20,
-                    color: category.color,
-                  ),
-                ),
-                const Gap(12),
-                // Title & Time column
+                // Reject button
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isIncome ? 'Nhận tiền' : 'Chuyển tiền',
-                        style: context.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
+                  child: GestureDetector(
+                    onTap: () => _handleReject(notification),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      const Gap(2),
-                      Row(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            Icons.access_time_rounded,
-                            size: 10,
-                            color: context.colorScheme.onSurface.withOpacity(0.5),
+                            Icons.close_rounded,
+                            color: AppColors.error,
+                            size: 18,
                           ),
-                          const Gap(4),
+                          const Gap(6),
                           Text(
-                            _formatTime(notification.timestamp),
+                            'Từ chối',
                             style: context.textTheme.bodySmall?.copyWith(
-                              fontSize: 11,
-                              color: context.colorScheme.onSurface.withOpacity(0.5),
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.error,
                             ),
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-                // Amount
-                Text(
-                  '$amountPrefix${notification.amount.toCompactCurrency}',
-                  style: context.textTheme.titleMedium?.copyWith(
-                    color: amountColor,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Divider
-          Divider(
-            height: 1,
-            color: context.colorScheme.onSurface.withOpacity(0.05),
-            indent: 16,
-            endIndent: 16,
-          ),
-
-          // 2. Details Section
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                // Bank
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: context.colorScheme.onSurface.withOpacity(0.03),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Icons.account_balance_rounded,
-                        size: 16,
-                        color: context.colorScheme.onSurface.withOpacity(0.6),
-                      ),
-                    ),
-                    const Gap(10),
-                    Expanded(
-                      child: Text(
-                        notification.bankName,
-                        style: context.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const Gap(12),
-                
-                // Raw Content Box
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: context.colorScheme.onSurface.withOpacity(0.03),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: context.colorScheme.onSurface.withOpacity(0.05),
                     ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Nội dung giao dịch',
-                        style: context.textTheme.labelSmall?.copyWith(
-                           color: context.colorScheme.onSurface.withOpacity(0.5),
-                           fontSize: 10,
-                        ),
-                      ),
-                      const Gap(4),
-                      Text(
-                        notification.rawContent,
-                        style: context.textTheme.bodySmall?.copyWith(
-                          color: context.colorScheme.onSurface.withOpacity(0.8),
-                          fontStyle: FontStyle.italic,
-                          height: 1.4,
-                        ),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
                 ),
-                
-                const Gap(12),
-
-                // AI Category Detection
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.primary.withOpacity(0.1),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.auto_awesome,
-                        size: 16,
-                        color: AppColors.primary,
-                      ),
-                      const Gap(8),
-                      Expanded(
-                        child: RichText(
-                          text: TextSpan(
-                            style: context.textTheme.bodySmall?.copyWith(
-                              color: context.colorScheme.onSurface,
-                            ),
-                            children: [
-                              TextSpan(
-                                text: 'Loại giao dịch: ',
-                                style: TextStyle(
-                                  color: context.colorScheme.onSurface.withOpacity(0.6),
-                                ),
-                              ),
-                              TextSpan(
-                                text: category.label,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // 3. Actions
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: Row(
-              children: [
+                const Gap(8),
+                // Accept button
                 Expanded(
-                  child: _buildActionButton(
-                    context,
-                    label: 'Từ chối',
-                    icon: Icons.close_rounded,
-                    color: AppColors.error,
-                    onTap: () => _handleReject(notification),
-                    isPrimary: false,
-                  ),
-                ),
-                const Gap(12),
-                Expanded(
-                  child: _buildActionButton(
-                    context,
-                    label: 'Chấp nhận',
-                    icon: Icons.check_rounded,
-                    color: const Color(0xFF10B981),
+                  child: GestureDetector(
                     onTap: () => _handleAccept(notification),
-                    isPrimary: true,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.check_rounded,
+                            color: Color(0xFF10B981),
+                            size: 18,
+                          ),
+                          const Gap(6),
+                          Text(
+                            'Chấp nhận',
+                            style: context.textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF10B981),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildActionButton(
-    BuildContext context, {
-    required String label,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-    required bool isPrimary,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Ink(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isPrimary ? color.withOpacity(0.1) : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isPrimary ? Colors.transparent : context.colorScheme.onSurface.withOpacity(0.1),
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon, 
-                size: 18, 
-                color: isPrimary ? color : context.colorScheme.onSurface.withOpacity(0.6)
-              ),
-              const Gap(8),
-              Text(
-                label,
-                style: context.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: isPrimary ? color : context.colorScheme.onSurface.withOpacity(0.6),
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
