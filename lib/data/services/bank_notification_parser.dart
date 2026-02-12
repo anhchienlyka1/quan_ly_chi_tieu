@@ -125,16 +125,31 @@ class BankNotificationParser {
   static bool _isIncomingTransaction(String text) {
     final lowerText = text.toLowerCase();
 
-    // Keywords nhận tiền
+    // 1. Ưu tiên check dấu +/- rõ ràng (Strong indicator)
+    // VD: "PS:+500000", "+500.000", "GD: +..."
+    if (RegExp(r'(?:^|\s|:)\+[\d.,]').hasMatch(lowerText)) {
+      return true;
+    }
+    if (RegExp(r'(?:^|\s|:)-[\d.,]').hasMatch(lowerText)) {
+      return false;
+    }
+
+    // 2. Check keywords nhận tiền (Check trước vì "Nhận chuyển tiền" chứa từ "chuyển tiền")
     final incomingKeywords = [
       'nhan duoc', 'nhận được', 'nhan', 'nhận',
+      'cong', 'cộng',
       'chuyen den', 'chuyển đến', 'chuyen toi',
       'credited', 'credit',
       'tien vao', 'tiền vào',
-      r'\+\d', // Số dương
     ];
 
-    // Keywords chuyển đi
+    for (final keyword in incomingKeywords) {
+      if (lowerText.contains(keyword)) {
+        return true;
+      }
+    }
+
+    // 3. Check keywords chuyển đi
     final outgoingKeywords = [
       'chuyen di', 'chuyển đi', 'chuyen tien',
       'thanh toan', 'thanh toán',
@@ -143,23 +158,15 @@ class BankNotificationParser {
       'debited', 'debit',
       'tien ra', 'tiền ra',
       'chi tieu', 'chi tiêu',
-      r'-\d', // Số âm
     ];
 
-    // Kiểm tra outgoing trước (phổ biến hơn)
     for (final keyword in outgoingKeywords) {
-      if (RegExp(keyword, caseSensitive: false).hasMatch(lowerText)) {
+      if (lowerText.contains(keyword)) {
         return false;
       }
     }
 
-    for (final keyword in incomingKeywords) {
-      if (RegExp(keyword, caseSensitive: false).hasMatch(lowerText)) {
-        return true;
-      }
-    }
-
-    // Default: chuyển đi (chi tiêu)
+    // Default: chuyển đi (chi tiêu) - an toàn hơn cho quản lý chi tiêu
     return false;
   }
 
