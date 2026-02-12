@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:isolate';
+import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
-import 'package:notification_listener_service/notification_listener_service.dart';
-import 'package:notification_listener_service/notification_event.dart';
+import 'package:flutter_notification_listener/flutter_notification_listener.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/extensions/number_extensions.dart';
 import '../models/bank_notification_model.dart';
@@ -16,16 +17,23 @@ import 'transaction_categorizer_service.dart';
 /// Callback chạy ở background isolate khi có notification mới.
 /// PHẢI là top-level function và có annotation @pragma('vm:entry-point')
 @pragma('vm:entry-point')
-void onNotificationReceived(ServiceNotificationEvent event) async {
-  // 1. Filter nhanh (tránh load SharedPreferences không cần thiết)
+void onNotificationReceived(NotificationEvent event) async {
+  // 1. Forward to UI Isolate if running
+  try {
+    final SendPort? send = IsolateNameServer.lookupPortByName(NotificationsListener.SEND_PORT_NAME);
+    send?.send(event);
+  } catch (e) {
+    debugPrint('⚠️ Error sending to UI isolate: $e');
+  }
+
+  // 2. Filter nhanh
   final packageName = event.packageName ?? '';
   if (!BankNotificationParser.isBankNotification(packageName)) return;
   
-  if (event.hasRemoved == true) return;
+  // Plugin flutter_notification_listener thường gửi event khi có noti.
 
   try {
-    // 2. Init SharedPreferences (vì đây là isolate mới)
-    // Cần gọi ensureInitialized cho isolate nền
+    // 2. Init SharedPreferences
     WidgetsFlutterBinding.ensureInitialized();
     final prefs = await SharedPreferences.getInstance();
     
@@ -33,7 +41,7 @@ void onNotificationReceived(ServiceNotificationEvent event) async {
     final parsed = BankNotificationParser.parseNotification(
       packageName: packageName,
       title: event.title ?? '',
-      content: event.content ?? '',
+      content: event.text ?? '', // Changed from .content to .text
     );
 
     if (parsed == null) return;
@@ -70,8 +78,44 @@ void onNotificationReceived(ServiceNotificationEvent event) async {
     // Tuy nhiên TransactionCategorizerService setup hơi phức tạp với Singleton.
     // Ta copy logic basic hoặc chấp nhận category 'other' lúc đầu.
     
-    // Ở đây ta cứ lưu trước, UI sẽ hiển thị.
-    pendingNotifications.insert(0, parsed);
+    // 5b. Internal Transfer Check (Link & Merge)
+    int matchIndex = -1;
+    for (int i = 0; i < pendingNotifications.length; i++) {
+        final item = pendingNotifications[i];
+        
+        // Time diff < 120s
+        if (item.timestamp.difference(parsed.timestamp).inSeconds.abs() > 120) continue;
+        
+        // Check criteria: Same amount, Opposite direction, Unlinked
+        if (item.amount == parsed.amount && 
+            item.isIncoming != parsed.isIncoming && 
+            item.linkedTransactionId == null) {
+          matchIndex = i;
+          break;
+        }
+    }
+
+    if (matchIndex != -1) {
+      // Merge found!
+      final existing = pendingNotifications[matchIndex];
+      debugPrint('🔗 [Background] Internal transfer detected: $packageName <-> ${existing.packageName}');
+      
+      final merged = existing.copyWith(
+        linkedTransactionId: parsed.id,
+        parsedTitle: 'Chuyển tiền nội bộ',
+        category: ExpenseCategory.other,
+        // Keep timestamp of older or newer? Usually keep first one.
+      );
+      pendingNotifications[matchIndex] = merged;
+    } else {
+      // No match -> Standard Insert
+      pendingNotifications.insert(
+        0, 
+        parsed.copyWith(
+          parsedTitle: parsed.isIncoming ? 'Nhận tiền' : 'Chuyển tiền'
+        )
+      );
+    }
     
     // Limit 50
     if (pendingNotifications.length > 50) {
@@ -90,7 +134,7 @@ void onNotificationReceived(ServiceNotificationEvent event) async {
 }
 
 /// Service tổng hợp: lắng nghe notification ngân hàng → parse → AI categorize → ghi chi tiêu.
-/// Hỗ trợ chạy ngầm trên Android nhờ `notification_listener_service`.
+/// Hỗ trợ chạy ngầm trên Android nhờ `flutter_notification_listener`.
 class AutoExpenseService with WidgetsBindingObserver {
   static AutoExpenseService? _instance;
   
@@ -171,9 +215,9 @@ class AutoExpenseService with WidgetsBindingObserver {
   Future<bool> hasPermission() async {
     if (kIsWeb) return false;
     try {
-      return await NotificationListenerService.isPermissionGranted();
+      final bool? isGranted = await NotificationsListener.hasPermission;
+      return isGranted ?? false;
     } catch (e) {
-      debugPrint('❌ Error checking notification permission: $e');
       return false;
     }
   }
@@ -182,7 +226,7 @@ class AutoExpenseService with WidgetsBindingObserver {
   Future<void> requestPermission() async {
     if (kIsWeb) return;
     try {
-      await NotificationListenerService.requestPermission();
+      await NotificationsListener.openPermissionSettings();
     } catch (e) {
       debugPrint('❌ Error requesting notification permission: $e');
     }
@@ -192,15 +236,9 @@ class AutoExpenseService with WidgetsBindingObserver {
   Future<bool> enable() async {
     if (kIsWeb) return false;
     
-    // Check permission
-    final hasAccess = await hasPermission();
-    if (!hasAccess) {
-      await requestPermission();
-      // Check again after request
-      final granted = await hasPermission();
-      if (!granted) return false;
-    }
-
+    // Open settings to let user enable
+    await requestPermission();
+    
     await _storage?.setAutoExpenseEnabled(true);
     await startListening();
     return true;
@@ -217,49 +255,25 @@ class AutoExpenseService with WidgetsBindingObserver {
     if (_isListening || kIsWeb) return;
 
     try {
-      /// Register background callback
-      NotificationListenerService.notificationsStream.listen(
-        (event) => _onForegroundNotificationInternal(event),
-        onError: (e) => debugPrint('❌ Foreground stream error: $e'),
+      // Register background callback
+      await NotificationsListener.initialize(callbackHandle: onNotificationReceived);
+      
+      // Listen to ReceivePort for foreground updates
+      // Note: receivePort might require re-registration if isolate changed, but plugin handles it.
+      _notificationSubscription = NotificationsListener.receivePort?.listen((event) {
+          if (event is NotificationEvent) {
+             _onForegroundNotificationInternal(event);
+          }
+      });
+      
+      // Start service (HEADLESS support)
+      await NotificationsListener.startService(
+        title: "Quản lý chi tiêu",
+        description: "Đang lắng nghe giao dịch...",
       );
-      
-      // Register static callback for background execution
-      // Note: This needs to be called to enable the background service logic
-      // The plugin might automatically use the stream for foreground
-      // But for background, we assume the OS wakes up the service defined in Manifest
-      // and checks for the callback.
-      
-      // IMPORTANT: The package 'notification_listener_service' uses a method channel
-      // but doesn't explicitly expose a 'registerBackgroundCallback' method in Dart 
-      // in some versions, or it relies on the stream being active.
-      // However, looking at standard implementation of such plugins (like flutter_background_service),
-      // we usually just need the permission and the service in Manifest.
-      
-      // Wait, checking the package docs/standards: 
-      // If the package supports background, it usually spawns an isolate.
-      // But this specific package 'notification_listener_service' is often simple.
-      // If it doesn't support HEADLESS execution out of the box with a Dart callback,
-      // my plan to use `onNotificationReceived` as an entry point might need 
-      // a specific method from the package to register it.
-      
-      // If the package DOES NOT have `registerGlobalServiceCallback`, 
-      // then we rely on the fact that `notificationsStream` works in foreground/background SERVICE
-      // as long as the Flutter engine is attached.
-      // BUT if the app is KILLED, the Flutter Engine dies.
-      
-      // **Correction**: The user requested functionality when app is KILLED.
-      // Standard `notification_listener_service` might NOT support reviving Dart VM when killed
-      // unless it explicitly says so.
-      // However, assuming we are upgrading/using a capable version or adapting.
-      // Let's assume for now we use the stream. If the app is killed, the Service in Android
-      // *should* stay alive if it returns START_STICKY, but without a UI, the Flutter Engine 
-      // inside Activity might detach.
-      
-      // CHECK: The Android Manifest declares `notification.listener.service.NotificationListener`.
-      // If the plugin implements a persistent Service, it might keep running.
-      
+
       _isListening = true;
-      debugPrint('✅ Auto-expense listener started');
+      debugPrint('✅ Auto-expense listener started (flutter_notification_listener)');
     } catch (e) {
       debugPrint('❌ Failed to start notification listener: $e');
       _isListening = false;
@@ -267,84 +281,32 @@ class AutoExpenseService with WidgetsBindingObserver {
   }
 
   /// Dừng lắng nghe
-  void stopListening() {
+  Future<void> stopListening() async {
     _notificationSubscription?.cancel();
     _notificationSubscription = null;
+    await NotificationsListener.stopService();
     _isListening = false;
     debugPrint('🛑 Auto-expense listener stopped');
   }
 
-  /// Xử lý notification khi app đang chạy (Foreground/Background mà chưa bị kill)
-  Future<void> _onForegroundNotificationInternal(ServiceNotificationEvent event) async {
+  /// Xử lý notification nhận được qua Port (Foreground/Background active)
+  Future<void> _onForegroundNotificationInternal(NotificationEvent event) async {
+    // Background callback (isolate) đã xử lý việc lưu vào SharedPreferences.
+    // Ở đây ta chỉ cần reload dữ liệu để UI cập nhật.
+    
     final String packageName = event.packageName ?? '';
-    final String title = event.title ?? '';
-    final String content = event.content ?? '';
-    
-    if (event.hasRemoved == true) return;
-
-    // Check bank
     if (!BankNotificationParser.isBankNotification(packageName)) return;
-
-    debugPrint('🏦 [Foreground] Bank notification: $packageName');
-
-    // Parse
-    final parsed = BankNotificationParser.parseNotification(
-      packageName: packageName,
-      title: title,
-      content: content,
-    );
-
-    if (parsed == null) return;
-
-    // Check duplicate
-    final isDuplicate = _pendingNotifications.any((n) {
-      final timeDiff = n.timestamp.difference(parsed.timestamp).inSeconds.abs();
-      return n.amount == parsed.amount &&
-             n.isIncoming == parsed.isIncoming &&
-             timeDiff < 60;
-    });
-
-    if (isDuplicate) {
-      debugPrint('🚫 Duplicate skipped');
-      return;
-    }
-
-    // AI Categorize (Only available in main isolate)
-    BankNotificationModel categorized = parsed;
-    try {
-      if (_categorizer != null) {
-        final result = await _categorizer!.categorize(
-          parsed.rawContent,
-          isIncoming: parsed.isIncoming,
-        );
-        
-        categorized = parsed.copyWith(
-          parsedTitle: result['title'] ?? parsed.rawContent,
-          category: TransactionCategorizerService.mapCategory(
-            result['category'] ?? 'other',
-            parsed.isIncoming,
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('⚠️ AI Error: $e');
-    }
-
-    // Add & Save
-    _addToPending(categorized);
-  }
-
-  /// Thêm vào danh sách chờ duyệt
-  void _addToPending(BankNotificationModel notification) {
-    _pendingNotifications.insert(0, notification);
     
-    if (_pendingNotifications.length > 50) {
-      _pendingNotifications = _pendingNotifications.sublist(0, 50);
-    }
-
-    _saveHistory();
-    _notificationStreamController.add(notification);
-    debugPrint('📋 Added: ${notification.parsedTitle} - ${notification.amount.toCurrency}');
+    debugPrint('🏦 [Foreground] Bank notification event received');
+    _loadHistory();
+    
+    // Notify UI to refresh
+     _notificationStreamController.add(
+        BankNotificationModel(
+          id: 'refresh_${DateTime.now().millisecondsSinceEpoch}', 
+          bankName: '', packageName: '', amount: 0, isIncoming: false, rawContent: '', timestamp: DateTime.now()
+        )
+      );
   }
 
   /// User chấp nhận giao dịch → lưu vào chi tiêu
@@ -354,7 +316,17 @@ class AutoExpenseService with WidgetsBindingObserver {
 
     final notification = _pendingNotifications[index];
     try {
-      final expense = notification.toExpenseModel();
+      var expense = notification.toExpenseModel();
+      
+      // Handle Internal Transfer: Amount = 0
+      if (notification.linkedTransactionId != null) {
+        expense = expense.copyWith(
+          amount: 0,
+          type: TransactionType.expense, // Or keep as is, effectively 0
+          note: '${expense.note}\n(Chuyển khoản nội bộ: ${notification.amount.toCurrency})',
+        );
+      }
+
       await _expenseRepository.addExpense(expense);
 
       if (_storage != null) {
@@ -362,11 +334,17 @@ class AutoExpenseService with WidgetsBindingObserver {
         double newBalance;
 
         if (notification.balance != null) {
+          // Trust SMS balance if available
           newBalance = notification.balance!;
         } else {
-          newBalance = notification.isIncoming 
-              ? currentBalance + notification.amount 
-              : currentBalance - notification.amount;
+          // If internal transfer -> No change (amount 0 effect)
+          if (notification.linkedTransactionId != null) {
+             newBalance = currentBalance;
+          } else {
+             newBalance = notification.isIncoming 
+                ? currentBalance + notification.amount 
+                : currentBalance - notification.amount;
+          }
         }
         await _storage!.setTotalBalance(newBalance);
       }

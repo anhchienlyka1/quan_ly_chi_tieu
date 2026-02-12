@@ -13,6 +13,7 @@ class BankNotificationModel {
   final DateTime timestamp; // Thời gian giao dịch
   final bool isAutoRecorded; // Đã tự động ghi vào chi tiêu chưa
   final double? balance; // Số dư còn lại (nếu parse được)
+  final String? linkedTransactionId; // ID giao dịch đối ứng (nếu là chuyển nội bộ)
 
   BankNotificationModel({
     required this.id,
@@ -26,7 +27,10 @@ class BankNotificationModel {
     required this.timestamp,
     this.isAutoRecorded = false,
     this.balance,
+    this.linkedTransactionId,
   });
+
+  bool get isInternalTransfer => linkedTransactionId != null;
 
   BankNotificationModel copyWith({
     String? id,
@@ -40,6 +44,7 @@ class BankNotificationModel {
     DateTime? timestamp,
     bool? isAutoRecorded,
     double? balance,
+    String? linkedTransactionId,
   }) {
     return BankNotificationModel(
       id: id ?? this.id,
@@ -53,6 +58,7 @@ class BankNotificationModel {
       timestamp: timestamp ?? this.timestamp,
       isAutoRecorded: isAutoRecorded ?? this.isAutoRecorded,
       balance: balance ?? this.balance,
+      linkedTransactionId: linkedTransactionId ?? this.linkedTransactionId,
     );
   }
 
@@ -70,6 +76,7 @@ class BankNotificationModel {
       'timestamp': timestamp.toIso8601String(),
       'isAutoRecorded': isAutoRecorded,
       'balance': balance,
+      'linkedTransactionId': linkedTransactionId,
     };
   }
 
@@ -92,6 +99,7 @@ class BankNotificationModel {
           : DateTime.now(),
       isAutoRecorded: map['isAutoRecorded'] as bool? ?? false,
       balance: (map['balance'] as num?)?.toDouble(),
+      linkedTransactionId: map['linkedTransactionId'] as String?,
     );
   }
 
@@ -102,12 +110,12 @@ class BankNotificationModel {
       amount: amount,
       category: category,
       date: timestamp,
-      note: 'Tự động ghi từ $bankName\nNội dung: $rawContent',
+      note: 'Tự động ghi từ $bankName\nNội dung: $rawContent${linkedTransactionId != null ? '\n(Giao dịch liên kết)' : ''}',
       type: isIncoming ? TransactionType.income : TransactionType.expense,
     );
   }
 
   @override
   String toString() =>
-      'BankNotification(bank: $bankName, amount: $amount, incoming: $isIncoming, title: $parsedTitle)';
+      'BankNotification(bank: $bankName, amount: $amount, incoming: $isIncoming, title: $parsedTitle, linked: $linkedTransactionId)';
 }

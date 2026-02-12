@@ -266,28 +266,7 @@ class _NotificationBottomSheetState extends State<_NotificationBottomSheet> {
           }),
         ],
 
-        // Recorded section
-        if (_recorded.isNotEmpty) ...[
-          const Gap(12),
-          _buildSectionLabel(context, 'Lịch sử gần đây', _recorded.length,
-              const Color(0xFF10B981)),
-          const Gap(10),
-          ..._recorded.take(5).toList().asMap().entries.map((entry) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _buildRecordedCard(
-                context,
-                entry.value,
-              )
-                  .animate(
-                      delay: Duration(
-                          milliseconds:
-                              (50 * (entry.key + _pending.length)).toInt()))
-                  .fade()
-                  .slideX(begin: 0.05, end: 0),
-            );
-          }),
-        ],
+
       ],
     );
   }

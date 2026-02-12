@@ -39,9 +39,10 @@
 
         <!-- Notification Listener Service for auto-expense recording -->
         <service
-            android:name="notification.listener.service.NotificationListener"
+            android:name="im.zoe.labs.flutter_notification_listener.NotificationsHandlerService"
+            android:label="flutter_notification_listener"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
-            android:exported="false">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
