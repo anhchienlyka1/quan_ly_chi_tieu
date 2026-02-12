@@ -1039,7 +1039,7 @@ class _AutoExpenseScreenState extends State<AutoExpenseScreen>
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '${isIncome ? '+' : '-'}${notification.amount.toCompactCurrency}',
+                      '${isIncome ? '+' : '-'}${notification.amount.toCurrency}',
                       style: context.textTheme.titleLarge?.copyWith(
                         color: statusColor,
                         fontWeight: FontWeight.bold,
@@ -1204,7 +1204,6 @@ class _AutoExpenseScreenState extends State<AutoExpenseScreen>
                 const Gap(16),
                 // Accept Button
                 Expanded(
-                  flex: 2, // Larger accept button
                   child: _buildActionButton(
                     context,
                     label: 'Xác nhận',

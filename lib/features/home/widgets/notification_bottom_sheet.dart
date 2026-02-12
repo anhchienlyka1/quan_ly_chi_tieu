@@ -322,7 +322,7 @@ class _NotificationBottomSheetState extends State<_NotificationBottomSheet> {
     );
   }
 
-  /// Compact Card for Pending Transactions (Pro Max UI)
+  /// Compact Card for Pending Transactions (Pro Max UI) - View Only
   Widget _buildPendingCard(BuildContext context, BankNotificationModel notification) {
     final isIncoming = notification.isIncoming;
     final accentColor = isIncoming
@@ -347,172 +347,86 @@ class _NotificationBottomSheetState extends State<_NotificationBottomSheet> {
           ),
         ],
       ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Category Icon (Smaller)
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: notification.category.color.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Category Icon (Smaller)
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: notification.category.color.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(
+                notification.category.icon,
+                color: notification.category.color,
+                size: 22,
+              ),
+            ),
+            const Gap(12),
+            
+            // Info Column
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    notification.parsedTitle.isNotEmpty
+                        ? notification.parsedTitle
+                        : notification.rawContent,
+                    style: context.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      height: 1.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  child: Icon(
-                    notification.category.icon,
-                    color: notification.category.color,
-                    size: 22,
-                  ),
-                ),
-                const Gap(12),
-                
-                // Info Column
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
+                  const Gap(4),
+                  Row(
                     children: [
-                      Text(
-                        notification.parsedTitle.isNotEmpty
-                            ? notification.parsedTitle
-                            : notification.rawContent,
-                        style: context.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          height: 1.2,
+                      // Small Bank Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: context.colorScheme.onSurface.withOpacity(0.04),
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        child: Text(
+                          notification.bankName,
+                          style: context.textTheme.labelSmall?.copyWith(
+                            fontSize: 10,
+                            color: context.colorScheme.onSurface.withOpacity(0.6),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ),
-                      const Gap(4),
-                      Row(
-                        children: [
-                          // Small Bank Badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: context.colorScheme.onSurface.withOpacity(0.04),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              notification.bankName,
-                              style: context.textTheme.labelSmall?.copyWith(
-                                fontSize: 10,
-                                color: context.colorScheme.onSurface.withOpacity(0.6),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          const Gap(6),
-                          Text(
-                            _formatTime(notification.timestamp),
-                            style: context.textTheme.labelSmall?.copyWith(
-                              color: context.colorScheme.onSurface.withOpacity(0.4),
-                              fontSize: 10,
-                            ),
-                          ),
-                        ],
+                      const Gap(6),
+                      Text(
+                        _formatTime(notification.timestamp),
+                        style: context.textTheme.labelSmall?.copyWith(
+                          color: context.colorScheme.onSurface.withOpacity(0.4),
+                          fontSize: 10,
+                        ),
                       ),
                     ],
                   ),
-                ),
-                
-                // Amount
-                Text(
-                   '${isIncoming ? '+' : '-'}${notification.amount.toCompactCurrency}',
-                  style: context.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: accentColor,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          
-          // Divider
-          Divider(
-            height: 1,
-            color: context.colorScheme.onSurface.withOpacity(0.05),
-          ),
-
-          // Action Buttons (Compact Row)
-          Row(
-            children: [
-              Expanded(
-                child: _buildActionButton(
-                  context,
-                  label: 'Từ chối',
-                  icon: Icons.close_rounded,
-                  color: AppColors.error, // Text Color
-                  backgroundColor: Colors.transparent, // Background
-                  onTap: () => _handleReject(notification),
-                ),
+            
+            // Amount
+            Text(
+               '${isIncoming ? '+' : '-'}${notification.amount.toCurrency}',
+              style: context.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: accentColor,
+                letterSpacing: -0.5,
               ),
-              Container(
-                width: 1, 
-                height: 24, 
-                color: context.colorScheme.onSurface.withOpacity(0.05)
-              ),
-              Expanded(
-                child: _buildActionButton(
-                  context,
-                  label: 'Chấp nhận',
-                  icon: Icons.check_rounded,
-                  color: const Color(0xFF10B981), // Text Color
-                  backgroundColor: Colors.transparent, // Background
-                  onTap: () => _handleAccept(notification),
-                  isBold: true,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionButton(
-    BuildContext context, {
-    required String label,
-    required IconData icon,
-    required Color color,
-    required Color backgroundColor,
-    required VoidCallback onTap,
-    bool isBold = false,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          onTap();
-        },
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(20),
-          bottomRight: Radius.circular(20),
-        ), // Match card
-        child: Ink(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: backgroundColor,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 18, color: color),
-              const Gap(8),
-              Text(
-                label,
-                style: context.textTheme.labelMedium?.copyWith(
-                  fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
-                  color: color,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
