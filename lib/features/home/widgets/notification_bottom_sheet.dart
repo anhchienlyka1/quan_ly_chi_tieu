@@ -322,196 +322,198 @@ class _NotificationBottomSheetState extends State<_NotificationBottomSheet> {
     );
   }
 
-  /// Compact Card for Pending Transactions (from Auto Expense Screen)
+  /// Compact Card for Pending Transactions (Pro Max UI)
   Widget _buildPendingCard(BuildContext context, BankNotificationModel notification) {
     final isIncoming = notification.isIncoming;
     final accentColor = isIncoming
-        ? const Color(0xFF10B981)
-        : const Color(0xFFEF4444);
+        ? AppColors.success
+        : AppColors.error;
 
     return Container(
-      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: context.isDarkMode ? const Color(0xFF252540) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: const Color(0xFFF59E0B).withOpacity(0.3),
-          width: 1.5,
+          color: context.colorScheme.onSurface.withOpacity(0.05),
+          width: 1,
         ),
         boxShadow: [
           BoxShadow(
             color: context.isDarkMode
                 ? Colors.black.withOpacity(0.2)
-                : const Color(0xFFF59E0B).withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
+                : const Color(0xFF6C63FF).withOpacity(0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         children: [
-          Row(
-            children: [
-              // Category icon
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: notification.category.color.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  notification.category.icon,
-                  color: notification.category.color,
-                  size: 20,
-                ),
-              ),
-              const Gap(12),
-              // Info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      notification.parsedTitle.isNotEmpty
-                          ? notification.parsedTitle
-                          : notification.rawContent,
-                      style: context.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const Gap(4),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: notification.category.color.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            notification.category.label,
-                            style: context.textTheme.bodySmall?.copyWith(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: notification.category.color,
-                            ),
-                          ),
-                        ),
-                        const Gap(6),
-                        Icon(
-                          Icons.account_balance_rounded,
-                          size: 11,
-                          color: context.colorScheme.onSurface.withOpacity(0.3),
-                        ),
-                        const Gap(3),
-                        Text(
-                          notification.bankName,
-                          style: context.textTheme.bodySmall?.copyWith(
-                            fontSize: 10,
-                            color: context.colorScheme.onSurface.withOpacity(0.4),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const Gap(6),
-              // Amount
-              Text(
-                '${isIncoming ? '+' : '-'}${notification.amount.toCurrency}',
-                style: context.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: accentColor,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
-          const Gap(10),
-          // Accept/Reject buttons
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-            decoration: BoxDecoration(
-              color: context.isDarkMode
-                  ? Colors.white.withOpacity(0.03)
-                  : Colors.grey.withOpacity(0.04),
-              borderRadius: BorderRadius.circular(12),
-            ),
+          Padding(
+            padding: const EdgeInsets.all(12),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Reject button
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => _handleReject(notification),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(
-                        color: AppColors.error.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.close_rounded,
-                            color: AppColors.error,
-                            size: 18,
-                          ),
-                          const Gap(6),
-                          Text(
-                            'Từ chối',
-                            style: context.textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.error,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                // Category Icon (Smaller)
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: notification.category.color.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    notification.category.icon,
+                    color: notification.category.color,
+                    size: 22,
                   ),
                 ),
-                const Gap(8),
-                // Accept button
+                const Gap(12),
+                
+                // Info Column
                 Expanded(
-                  child: GestureDetector(
-                    onTap: () => _handleAccept(notification),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        notification.parsedTitle.isNotEmpty
+                            ? notification.parsedTitle
+                            : notification.rawContent,
+                        style: context.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          height: 1.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      const Gap(4),
+                      Row(
                         children: [
-                          const Icon(
-                            Icons.check_rounded,
-                            color: Color(0xFF10B981),
-                            size: 18,
+                          // Small Bank Badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: context.colorScheme.onSurface.withOpacity(0.04),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              notification.bankName,
+                              style: context.textTheme.labelSmall?.copyWith(
+                                fontSize: 10,
+                                color: context.colorScheme.onSurface.withOpacity(0.6),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ),
                           const Gap(6),
                           Text(
-                            'Chấp nhận',
-                            style: context.textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF10B981),
+                            _formatTime(notification.timestamp),
+                            style: context.textTheme.labelSmall?.copyWith(
+                              color: context.colorScheme.onSurface.withOpacity(0.4),
+                              fontSize: 10,
                             ),
                           ),
                         ],
                       ),
-                    ),
+                    ],
+                  ),
+                ),
+                
+                // Amount
+                Text(
+                   '${isIncoming ? '+' : '-'}${notification.amount.toCompactCurrency}',
+                  style: context.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: accentColor,
+                    letterSpacing: -0.5,
                   ),
                 ),
               ],
             ),
           ),
+          
+          // Divider
+          Divider(
+            height: 1,
+            color: context.colorScheme.onSurface.withOpacity(0.05),
+          ),
+
+          // Action Buttons (Compact Row)
+          Row(
+            children: [
+              Expanded(
+                child: _buildActionButton(
+                  context,
+                  label: 'Từ chối',
+                  icon: Icons.close_rounded,
+                  color: AppColors.error, // Text Color
+                  backgroundColor: Colors.transparent, // Background
+                  onTap: () => _handleReject(notification),
+                ),
+              ),
+              Container(
+                width: 1, 
+                height: 24, 
+                color: context.colorScheme.onSurface.withOpacity(0.05)
+              ),
+              Expanded(
+                child: _buildActionButton(
+                  context,
+                  label: 'Chấp nhận',
+                  icon: Icons.check_rounded,
+                  color: const Color(0xFF10B981), // Text Color
+                  backgroundColor: Colors.transparent, // Background
+                  onTap: () => _handleAccept(notification),
+                  isBold: true,
+                ),
+              ),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton(
+    BuildContext context, {
+    required String label,
+    required IconData icon,
+    required Color color,
+    required Color backgroundColor,
+    required VoidCallback onTap,
+    bool isBold = false,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(20),
+          bottomRight: Radius.circular(20),
+        ), // Match card
+        child: Ink(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: color),
+              const Gap(8),
+              Text(
+                label,
+                style: context.textTheme.labelMedium?.copyWith(
+                  fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
