@@ -326,7 +326,7 @@ class _AutoExpenseScreenState extends State<AutoExpenseScreen>
                 child: Switch(
                   value: _isEnabled,
                   onChanged: _toggleAutoExpense,
-                  activeColor: const Color(0xFFEC4899),
+                  activeThumbColor: const Color(0xFFEC4899),
                   activeTrackColor: const Color(0xFFEC4899).withOpacity(0.4),
                 ),
               ),

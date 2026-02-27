@@ -7,7 +7,6 @@ import '../../../core/extensions/context_extensions.dart';
 import '../../../core/extensions/date_extensions.dart';
 import '../../../core/extensions/number_extensions.dart';
 import '../../../data/models/expense_model.dart';
-import '../../../app/routes/route_names.dart';
 
 class ExpenseItem extends StatelessWidget {
   final ExpenseModel expense;

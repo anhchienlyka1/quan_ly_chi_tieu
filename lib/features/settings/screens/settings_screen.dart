@@ -439,7 +439,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
       child: Switch(
         value: value,
         onChanged: onChanged,
-        activeColor: activeColor,
+        activeThumbColor: activeColor,
         activeTrackColor: activeColor.withOpacity(0.5),
       ),
     );

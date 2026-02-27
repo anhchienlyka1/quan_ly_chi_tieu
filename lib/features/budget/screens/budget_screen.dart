@@ -599,7 +599,7 @@ class _BudgetScreenState extends State<BudgetScreen>
                   }
                 });
               },
-              activeColor: category.color,
+              activeThumbColor: category.color,
               activeTrackColor: category.color.withOpacity(0.3),
             ),
           ),
