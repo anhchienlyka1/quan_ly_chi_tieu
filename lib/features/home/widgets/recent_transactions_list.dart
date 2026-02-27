@@ -77,7 +77,8 @@ class RecentTransactionsList extends StatelessWidget {
 
   Widget _buildEmptyState(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
       decoration: BoxDecoration(
         color: context.isDarkMode ? context.theme.cardTheme.color : Colors.white,
         borderRadius: BorderRadius.circular(24),
@@ -90,6 +91,7 @@ class RecentTransactionsList extends StatelessWidget {
         ],
       ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
             padding: const EdgeInsets.all(20),
@@ -102,21 +104,27 @@ class RecentTransactionsList extends StatelessWidget {
               size: 40,
               color: AppColors.primary.withOpacity(0.4),
             ),
-          ),
+          )
+              .animate(onPlay: (c) => c.repeat(reverse: true))
+              .scale(begin: const Offset(1, 1), end: const Offset(1.1, 1.1), duration: 2000.ms),
           const Gap(16),
           Text(
             'Chưa có giao dịch nào',
             style: context.textTheme.bodyMedium?.copyWith(
-              color: context.colorScheme.onSurface.withOpacity(0.5),
-              fontWeight: FontWeight.w600,
+              color: context.colorScheme.onSurface.withOpacity(0.6),
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
             ),
+            textAlign: TextAlign.center,
           ),
-          const Gap(6),
+          const Gap(8),
           Text(
             'Nhấn nút + để thêm chi tiêu đầu tiên',
             style: context.textTheme.bodySmall?.copyWith(
-              color: context.colorScheme.onSurface.withOpacity(0.3),
+              color: context.colorScheme.onSurface.withOpacity(0.4),
+              height: 1.4,
             ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),

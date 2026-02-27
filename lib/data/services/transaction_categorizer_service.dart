@@ -23,11 +23,22 @@ class TransactionCategorizerService {
   static const String _apiKey = 'AIzaSyDkw6n8Id3r6SHZEsE-fnE8UrUCrwvQ8Gk';
   
   Future<void> _init() async {
-    // Use hardcoded API key
-    if (_apiKey.isNotEmpty && _apiKey != 'AIzaSyBt7W8xqVOGHhF_example_REPLACE_WITH_YOUR_KEY') {
+    // Try to get API key from SharedPreferences first
+    final prefs = await SharedPreferences.getInstance();
+    final userKey = prefs.getString('gemini_api_key');
+
+    String keyToUse = '';
+    if (userKey != null && userKey.isNotEmpty) {
+      keyToUse = userKey;
+    } else if (_apiKey.isNotEmpty &&
+        _apiKey != 'AIzaSyBt7W8xqVOGHhF_example_REPLACE_WITH_YOUR_KEY') {
+      keyToUse = _apiKey;
+    }
+
+    if (keyToUse.isNotEmpty) {
       _model = GenerativeModel(
         model: 'gemini-2.0-flash',
-        apiKey: _apiKey,
+        apiKey: keyToUse,
       );
     }
   }
@@ -72,34 +83,39 @@ class TransactionCategorizerService {
         : 'food, transport, shopping, entertainment, health, education, bills, other';
 
     final prompt = '''
-Bạn là trợ lý phân tích giao dịch ngân hàng Việt Nam.
+Bạn là chuyên gia ngôn ngữ học và phân tích tài chính người Việt Nam.
+Nhiệm vụ của bạn là khôi phục dấu tiếng Việt chính xác cho nội dung giao dịch và phân loại nó.
 
-Loại giao dịch: $transactionType
-Nội dung chuyển khoản: "$rawContent"
+Thông tin giao dịch:
+- Loại giao dịch: $transactionType
+- Nội dung gốc (thường không dấu): "$rawContent"
 
-Lưu ý: Nội dung thường là CHỮ KHÔNG DẤU tiếng Việt (VD: "THANH TOAN TIEN DIEN THANG 1" = "Thanh toán tiền điện tháng 1").
+Yêu cầu chi tiết:
+1. KHÔI PHỤC DẤU TIẾNG VIỆT: Hãy phân tích kỹ ngữ cảnh và tên riêng để thêm dấu chính xác.
+   - Ví dụ: "PHAM VAN CHIEN chuyen tien an sang" -> "Phạm Văn Chiến chuyển tiền ăn sáng"
+   - Ví dụ: "tien nha thang 1" -> "Tiền nhà tháng 1"
+2. PHÂN LOẠI (Category): Chọn 1 category phù hợp nhất từ danh sách bên dưới.
+3. TIÊU ĐỀ (Title): Là nội dung đã được khôi phục dấu tiếng Việt, viết hoa chữ cái đầu và tên riêng.
 
-Hãy phân tích và trả về JSON (CHỈ JSON, KHÔNG kèm text khác):
+Danh sách Category:
+- food: ăn uống, ăn sáng, cafe, nhà hàng...
+- transport: di chuyển, grab, xăng, xe...
+- shopping: mua sắm, siêu thị...
+- entertainment: giải trí, phim...
+- health: thuốc, khám bệnh...
+- education: học phí, sách...
+- bills: điện, nước, net, tiền nhà...
+- salary: lương...
+- bonus: thưởng...
+- investment: đầu tư...
+- gift: biếu tặng...
+- other: khác (sử dụng khi không xác định được loại giao dịch hoặc không thuộc các loại trên)
+
+Hãy trả về kết quả dưới dạng JSON hợp lệ (không markdown):
 {
-  "category": "một trong: $categories",
-  "title": "tiêu đề ngắn gọn CÓ DẤU tiếng Việt mô tả giao dịch"
+  "category": "category_code",
+  "title": "Nội dung đã khôi phục dấu"
 }
-
-Quy tắc phân loại:
-- food: ăn uống, nhà hàng, quán ăn, cafe, grab food, shopee food, baemin
-- transport: di chuyển, xăng, grab, taxi, parking, gửi xe
-- shopping: mua sắm, shopee, lazada, tiki, siêu thị, tạp hóa
-- entertainment: giải trí, phim, game, karaoke, du lịch
-- health: sức khỏe, thuốc, bệnh viện, khám bệnh, phòng khám
-- education: giáo dục, học phí, sách, khóa học, trường
-- bills: hóa đơn, điện, nước, internet, wifi, thuê nhà, tiền nhà
-- salary: lương tháng
-- bonus: thưởng, hoa hồng
-- investment: đầu tư, chứng khoán, crypto
-- gift: quà tặng, mừng, biếu
-- other: không xác định rõ
-
-CHỈ trả về JSON object, không markdown, không code block.
 ''';
 
     final response = await _model!.generateContent([
@@ -120,9 +136,15 @@ CHỈ trả về JSON object, không markdown, không code block.
     }
 
     final json = jsonDecode(jsonStr) as Map<String, dynamic>;
+    final title = json['title'] as String? ?? rawContent;
+    final category = json['category'] as String? ?? 'other';
+    
+    print('🤖 AI response json: $jsonStr'); // Print full JSON for debugging
+    print('🤖 AI translated content: "$title"'); // Print the specific translated content
+
     return {
-      'category': json['category'] as String? ?? 'other',
-      'title': json['title'] as String? ?? rawContent,
+      'category': category,
+      'title': title,
     };
   }
 
@@ -132,22 +154,28 @@ CHỈ trả về JSON object, không markdown, không code block.
     bool isIncoming,
   ) {
     final lower = rawContent.toLowerCase();
+    String title = rawContent; 
+    
+    // Helper to format title if needed (simple capitalization)
+    if (title.isNotEmpty) {
+      title = title[0].toUpperCase() + title.substring(1);
+    }
 
     if (isIncoming) {
       // Thu nhập
       if (_matchAny(lower, ['luong', 'salary', 'luong thang'])) {
-        return {'category': 'salary', 'title': 'Lương tháng'};
+        return {'category': 'salary', 'title': title};
       }
       if (_matchAny(lower, ['thuong', 'bonus', 'hoa hong'])) {
-        return {'category': 'bonus', 'title': 'Tiền thưởng'};
+        return {'category': 'bonus', 'title': title};
       }
       if (_matchAny(lower, ['dau tu', 'chung khoan', 'lai suat'])) {
-        return {'category': 'investment', 'title': 'Thu nhập đầu tư'};
+        return {'category': 'investment', 'title': title};
       }
       if (_matchAny(lower, ['tang', 'mung', 'bieu', 'qua'])) {
-        return {'category': 'gift', 'title': 'Quà tặng'};
+        return {'category': 'gift', 'title': title};
       }
-      return {'category': 'other', 'title': 'Nhận tiền'};
+      return {'category': 'other', 'title': title};
     }
 
     // Chi tiêu
@@ -157,42 +185,42 @@ CHỈ trả về JSON object, không markdown, không code block.
       'grabfood', 'shopeefood', 'baemin', 'food',
       'banh', 'do an', 'an sang', 'an trua', 'an toi',
     ])) {
-      return {'category': 'food', 'title': 'Ăn uống'};
+      return {'category': 'food', 'title': title};
     }
 
     if (_matchAny(lower, [
       'xang', 'grab', 'taxi', 'di chuyen',
       'gui xe', 'parking', 'xe bus', 've xe',
     ])) {
-      return {'category': 'transport', 'title': 'Di chuyển'};
+      return {'category': 'transport', 'title': title};
     }
 
     if (_matchAny(lower, [
       'shopee', 'lazada', 'tiki', 'mua sam',
       'sieu thi', 'tap hoa', 'mua', 'dat hang',
     ])) {
-      return {'category': 'shopping', 'title': 'Mua sắm'};
+      return {'category': 'shopping', 'title': title};
     }
 
     if (_matchAny(lower, [
       'phim', 'game', 'karaoke', 'giai tri',
       'du lich', 'resort', 'khach san',
     ])) {
-      return {'category': 'entertainment', 'title': 'Giải trí'};
+      return {'category': 'entertainment', 'title': title};
     }
 
     if (_matchAny(lower, [
       'thuoc', 'benh vien', 'kham benh',
       'suc khoe', 'phong kham', 'bac si',
     ])) {
-      return {'category': 'health', 'title': 'Sức khỏe'};
+      return {'category': 'health', 'title': title};
     }
 
     if (_matchAny(lower, [
       'hoc phi', 'sach', 'truong', 'giao duc',
       'khoa hoc', 'hoc', 'dao tao',
     ])) {
-      return {'category': 'education', 'title': 'Giáo dục'};
+      return {'category': 'education', 'title': title};
     }
 
     if (_matchAny(lower, [
@@ -200,14 +228,18 @@ CHỈ trả về JSON object, không markdown, không code block.
       'thue nha', 'tien nha', 'hoa don',
       'truyen hinh', 'dien thoai', 'cuoc',
     ])) {
-      return {'category': 'bills', 'title': 'Hóa đơn & tiện ích'};
+      return {'category': 'bills', 'title': title};
     }
 
     if (_matchAny(lower, ['thanh toan'])) {
-      return {'category': 'bills', 'title': 'Thanh toán'};
+      return {'category': 'bills', 'title': title};
     }
 
-    return {'category': 'other', 'title': 'Giao dịch khác'};
+    if (_matchAny(lower, ['chuyen tien', 'ck', 'chuyen khoan'])) {
+      return {'category': 'other', 'title': title};
+    }
+
+    return {'category': 'other', 'title': title};
   }
 
   bool _matchAny(String text, List<String> keywords) {

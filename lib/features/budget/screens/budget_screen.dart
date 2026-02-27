@@ -686,7 +686,8 @@ class _BudgetScreenState extends State<BudgetScreen>
   ) {
     return Row(
       children: [
-        Text(emoji, style: const TextStyle(fontSize: 16)),
+        Text(emoji,
+            style: context.textTheme.bodyLarge?.copyWith(fontSize: 16)),
         const Gap(10),
         Expanded(
           child: Text(

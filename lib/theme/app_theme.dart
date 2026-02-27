@@ -19,13 +19,13 @@ class ProTheme {
         titleLarge: const TextStyle(fontWeight: FontWeight.w600),
         bodyLarge: const TextStyle(fontSize: 16, height: 1.5),
       ),
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        titleTextStyle: TextStyle(
-          color: Color(0xFF1A1A1A),
+        titleTextStyle: GoogleFonts.outfit(
+          color: const Color(0xFF1A1A1A),
           fontSize: 20,
           fontWeight: FontWeight.bold,
         ),
@@ -34,7 +34,7 @@ class ProTheme {
         style: FilledButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+          textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 16),
         ),
       ),
       cardTheme: CardThemeData(
@@ -86,12 +86,12 @@ class ProTheme {
         titleLarge: const TextStyle(fontWeight: FontWeight.w600),
         bodyLarge: const TextStyle(fontSize: 16, height: 1.5),
       ),
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        titleTextStyle: TextStyle(
+        titleTextStyle: GoogleFonts.outfit(
           color: Colors.white,
           fontSize: 20,
           fontWeight: FontWeight.bold,
@@ -101,7 +101,7 @@ class ProTheme {
         style: FilledButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+          textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 16),
         ),
       ),
       cardTheme: CardThemeData(

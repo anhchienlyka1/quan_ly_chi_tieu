@@ -169,7 +169,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
-        showNotificationBottomSheet(context).then((shouldNavigate) {
+        showNotificationBottomSheet(
+          context,
+          onTransactionProcessed: _loadExpenses,
+        ).then((shouldNavigate) {
           if (shouldNavigate) {
             context.pushNamed(RouteNames.autoExpense).then((_) {
               _loadExpenses();
@@ -302,7 +305,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 child: Center(
                   child: Text(
                     pendingCount > 9 ? '9+' : '$pendingCount',
-                    style: const TextStyle(
+                    style: context.textTheme.labelSmall?.copyWith(
                       color: Colors.white,
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
@@ -546,7 +549,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             const Gap(4),
             AnimatedDefaultTextStyle(
               duration: const Duration(milliseconds: 250),
-              style: TextStyle(
+              style: context.textTheme.labelSmall!.copyWith(
                 fontSize: 10,
                 fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
                 color: isActive
