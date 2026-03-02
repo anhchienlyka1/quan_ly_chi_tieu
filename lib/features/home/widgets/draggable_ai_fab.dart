@@ -9,10 +9,12 @@ import '../../../core/extensions/context_extensions.dart';
 /// across the screen. Displays a premium sparkle icon with glow animation.
 class DraggableAiFab extends StatefulWidget {
   final VoidCallback onTap;
+  final bool showAlertDot;
 
   const DraggableAiFab({
     super.key,
     required this.onTap,
+    this.showAlertDot = false,
   });
 
   @override
@@ -151,7 +153,33 @@ class _DraggableAiFabState extends State<DraggableAiFab>
 
               return Transform.translate(
                 offset: Offset(0, floatOffset),
-                child: _buildFab(context, glowValue),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    _buildFab(context, glowValue),
+                    // Red notification dot for urgent alerts
+                    if (widget.showAlertDot)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEF4444),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFEF4444).withOpacity(0.5),
+                                blurRadius: 6,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               );
             },
           ),

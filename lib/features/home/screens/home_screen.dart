@@ -11,6 +11,8 @@ import '../../../data/repositories/expense_repository.dart';
 import '../../../data/services/auto_expense_service.dart';
 import '../../../data/services/local_storage_service.dart';
 import '../../../data/services/budget_service.dart';
+import '../../../data/services/ai_assistant_service.dart';
+import '../../../data/services/mock_data_service.dart';
 import '../../budget/widgets/budget_progress_card.dart';
 import '../widgets/ai_assistant_popup.dart';
 import '../widgets/balance_card.dart';
@@ -36,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _isLoading = true;
   int _currentNavIndex = 0;
   bool _showAiFab = true;
+  bool _hasUrgentAlert = false;
 
   @override
   void initState() {
@@ -62,11 +65,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final currentBalance = storage.getTotalBalance();
 
       if (mounted) {
+        // Check for urgent triggers
+        bool urgentAlert = false;
+        try {
+          urgentAlert = _checkUrgentTrigger(expenses, budgetProgress);
+        } catch (_) {}
+
         setState(() {
           _expenses = expenses;
           _budgetProgress = budgetProgress;
           _currentBalance = currentBalance;
           _showAiFab = storage.isAiAssistantEnabled();
+          _hasUrgentAlert = urgentAlert;
           _isLoading = false;
         });
       }
@@ -90,6 +100,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _navigateAndRefresh(RouteNames.budget);
       },
     );
+  }
+
+  /// Quick check if there's an urgent trigger (P0/P1) — runs locally, no AI call
+  bool _checkUrgentTrigger(List<ExpenseModel> expenses, BudgetProgress? budgetProgress) {
+    if (budgetProgress == null || !budgetProgress.budget.isSet) return false;
+
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    final startOfWeekDate = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+
+    final thisWeekTotal = expenses
+        .where((e) => e.type == TransactionType.expense &&
+            e.date.isAfter(startOfWeekDate.subtract(const Duration(seconds: 1))))
+        .fold<double>(0, (s, e) => s + e.amount);
+
+    final weeklyBudget = budgetProgress.budget.totalBudget / 4;
+    return weeklyBudget > 0 && thisWeekTotal > weeklyBudget * 0.8;
   }
 
   double get _totalExpense =>
@@ -142,6 +169,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         if (_showAiFab)
           DraggableAiFab(
             onTap: _showAiAssistantPopup,
+            showAlertDot: _hasUrgentAlert,
           ),
       ],
     );
@@ -164,11 +192,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               ),
               const Gap(4),
-              Text(
-                'Quản lý tài chính',
-                style: context.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: context.colorScheme.onSurface,
+              GestureDetector(
+                onLongPress: () async {
+                  HapticFeedback.heavyImpact();
+                  await MockDataService.seedAll();
+                  await _loadExpenses();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('✅ Mock data loaded!'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                },
+                child: Text(
+                  'Quản lý tài chính',
+                  style: context.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: context.colorScheme.onSurface,
+                  ),
                 ),
               ),
             ],

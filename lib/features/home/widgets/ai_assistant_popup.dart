@@ -79,45 +79,36 @@ class _AiChatSheetState extends State<_AiChatSheet>
   Future<void> _initChat() async {
     try {
       _service = await AiAssistantService.getInstance();
-      _service!.startNewSession(
+
+      // Show typing indicator while AI generates proactive welcome
+      if (mounted) setState(() => _isAiTyping = true);
+
+      final welcomeMessage = await _service!.startNewSession(
         expenses: widget.expenses,
         totalBalance: widget.totalBalance,
         monthlyBudget: widget.budgetProgress?.budget.totalBudget ?? 0,
         categoryBudgets: widget.budgetProgress?.budget.categoryBudgets,
       );
 
-      // Add welcome message
-      final hour = DateTime.now().hour;
-      String greeting;
-      if (hour < 12) {
-        greeting = 'Chào buổi sáng! ☀️';
-      } else if (hour < 18) {
-        greeting = 'Chào buổi chiều! 🌤️';
-      } else {
-        greeting = 'Chào buổi tối! 🌙';
-      }
-
       if (mounted) {
         setState(() {
+          _isAiTyping = false;
           _messages.add(ChatMessage(
-            text: '$greeting Mình là Fin — trợ lý tài chính AI của bạn! 🤖\n\n'
-                'Mình đã nắm được tình hình chi tiêu tháng này của bạn rồi. '
-                'Bạn muốn hỏi gì nào? 😊',
+            text: welcomeMessage,
             isUser: false,
             timestamp: DateTime.now(),
           ));
-
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
+          _isAiTyping = false;
           _messages.add(ChatMessage(
             text: '⚠️ Không thể kết nối AI. Vui lòng kiểm tra kết nối mạng hoặc API key.',
             isUser: false,
             timestamp: DateTime.now(),
           ));
-
         });
       }
     }
@@ -490,7 +481,7 @@ class _AiChatSheetState extends State<_AiChatSheet>
 
   Widget _buildSuggestedQuestions(BuildContext context) {
     final isDark = context.isDarkMode;
-    final suggestions = AiAssistantService.suggestedQuestions;
+    final suggestions = _service?.suggestedQuestions ?? AiAssistantService.defaultQuestions;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
