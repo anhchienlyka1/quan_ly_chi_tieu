@@ -12,7 +12,9 @@ import '../../../data/services/auto_expense_service.dart';
 import '../../../data/services/local_storage_service.dart';
 import '../../../data/services/budget_service.dart';
 import '../../budget/widgets/budget_progress_card.dart';
+import '../widgets/ai_assistant_popup.dart';
 import '../widgets/balance_card.dart';
+import '../widgets/draggable_ai_fab.dart';
 import '../widgets/notification_bottom_sheet.dart';
 import '../widgets/quick_shortcuts.dart';
 import '../widgets/recent_transactions_list.dart';
@@ -33,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   double _currentBalance = 0;
   bool _isLoading = true;
   int _currentNavIndex = 0;
+  bool _showAiFab = true;
 
   @override
   void initState() {
@@ -63,6 +66,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           _expenses = expenses;
           _budgetProgress = budgetProgress;
           _currentBalance = currentBalance;
+          _showAiFab = storage.isAiAssistantEnabled();
           _isLoading = false;
         });
       }
@@ -71,6 +75,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  void _showAiAssistantPopup() {
+    showAiAssistantSheet(
+      context,
+      expenses: _expenses,
+      totalBalance: _currentBalance,
+      budgetProgress: _budgetProgress,
+      onViewStatistics: () {
+        Navigator.of(context).pushNamed(RouteNames.statistics);
+      },
+      onSetBudget: () {
+        _navigateAndRefresh(RouteNames.budget);
+      },
+    );
   }
 
   double get _totalExpense =>
@@ -88,33 +107,43 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: context.theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _loadExpenses,
-          color: AppColors.primary,
-          child: CustomScrollView(
-            physics: const BouncingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
-            ),
-            slivers: [
-              // Custom App Bar
-              SliverToBoxAdapter(
-                child: _buildHeader(context),
-              ),
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: context.theme.scaffoldBackgroundColor,
+          body: SafeArea(
+            child: RefreshIndicator(
+              onRefresh: _loadExpenses,
+              color: AppColors.primary,
+              child: CustomScrollView(
+                physics: const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics(),
+                ),
+                slivers: [
+                  // Custom App Bar
+                  SliverToBoxAdapter(
+                    child: _buildHeader(context),
+                  ),
 
-              // Content
-              SliverToBoxAdapter(
-                child: _isLoading
-                    ? _buildLoadingState(context)
-                    : _buildContent(context),
+                  // Content
+                  SliverToBoxAdapter(
+                    child: _isLoading
+                        ? _buildLoadingState(context)
+                        : _buildContent(context),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
+          bottomNavigationBar: _buildBottomNav(context),
         ),
-      ),
-      bottomNavigationBar: _buildBottomNav(context),
+
+        // Draggable AI Assistant FAB — topmost layer
+        if (_showAiFab)
+          DraggableAiFab(
+            onTap: _showAiAssistantPopup,
+          ),
+      ],
     );
   }
 
@@ -519,9 +548,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             break;
         }
         
-        // Reset to Home tab when returning
+        // Reset to Home tab and refresh AI setting when returning
         if (mounted && index != 0) {
           setState(() => _currentNavIndex = 0);
+          // Refresh AI FAB visibility in case user changed setting
+          final storage = await LocalStorageService.getInstance();
+          if (mounted) {
+            setState(() => _showAiFab = storage.isAiAssistantEnabled());
+          }
         }
       },
       behavior: HitTestBehavior.opaque,

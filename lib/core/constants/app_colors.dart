@@ -59,4 +59,20 @@ class AppColors {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
+
+  // AI Assistant Colors
+  static const LinearGradient aiGradient = LinearGradient(
+    colors: [Color(0xFF6C63FF), Color(0xFF00D2D3), Color(0xFF8B5CF6)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient aiGradientSubtle = LinearGradient(
+    colors: [Color(0xFF6C63FF), Color(0xFF8B5CF6)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const Color aiGlow = Color(0xFF6C63FF);
+  static const Color aiAccent = Color(0xFF00D2D3);
 }

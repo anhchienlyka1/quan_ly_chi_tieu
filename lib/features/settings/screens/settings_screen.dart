@@ -6,6 +6,7 @@ import '../../../data/services/pin_service.dart';
 import '../../../data/repositories/expense_repository.dart';
 import 'package:gap/gap.dart';
 import 'package:flutter/services.dart';
+import '../../../data/services/local_storage_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -18,6 +19,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  bool _aiAssistantEnabled = true;
 
   @override
   void initState() {
@@ -37,6 +39,14 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     ).animate(CurvedAnimation(parent: _animationController, curve: Curves.easeOut));
     
     _animationController.forward();
+    _loadAiSetting();
+  }
+
+  Future<void> _loadAiSetting() async {
+    final storage = await LocalStorageService.getInstance();
+    if (mounted) {
+      setState(() => _aiAssistantEnabled = storage.isAiAssistantEnabled());
+    }
   }
 
   @override
@@ -164,6 +174,24 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                                   Icons.arrow_forward_ios_rounded,
                                   size: 16,
                                   color: Colors.grey,
+                                ),
+                              ),
+                              _buildDivider(context),
+
+                              _buildSettingsItem(
+                                context,
+                                icon: Icons.auto_awesome_rounded,
+                                label: 'Trợ lý AI',
+                                subtitle: _aiAssistantEnabled ? 'Hiển thị trên màn hình chính' : 'Đã ẩn',
+                                iconColor: const Color(0xFF8B5CF6),
+                                trailing: _buildModernSwitch(
+                                  value: _aiAssistantEnabled,
+                                  onChanged: (value) async {
+                                    final storage = await LocalStorageService.getInstance();
+                                    await storage.setAiAssistantEnabled(value);
+                                    setState(() => _aiAssistantEnabled = value);
+                                  },
+                                  activeColor: const Color(0xFF8B5CF6),
                                 ),
                               ),
                               _buildDivider(context),

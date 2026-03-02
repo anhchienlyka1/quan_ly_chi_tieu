@@ -17,6 +17,7 @@ class LocalStorageService {
   static const String _keyFirstLaunch = 'first_launch';
   static const String _keyAutoExpenseEnabled = 'auto_expense_enabled';
   static const String _keyAutoExpenseHistory = 'auto_expense_history';
+  static const String _keyAiAssistantEnabled = 'ai_assistant_enabled';
 
   // Theme Mode
   Future<void> setThemeMode(String mode) async {
@@ -69,5 +70,14 @@ class LocalStorageService {
 
   double getTotalBalance() {
     return _preferences?.getDouble('total_balance') ?? 0.0;
+  }
+
+  // AI Assistant
+  Future<void> setAiAssistantEnabled(bool value) async {
+    await _preferences?.setBool(_keyAiAssistantEnabled, value);
+  }
+
+  bool isAiAssistantEnabled() {
+    return _preferences?.getBool(_keyAiAssistantEnabled) ?? true;
   }
 }
