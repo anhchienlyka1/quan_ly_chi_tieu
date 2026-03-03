@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../app/routes/route_names.dart';
 import '../../../core/extensions/context_extensions.dart';
 import '../../../main.dart';
 import '../../../data/services/pin_service.dart';
-import '../../../data/repositories/expense_repository.dart';
+import '../../../data/providers/expense_provider.dart';
 import 'package:gap/gap.dart';
 import 'package:flutter/services.dart';
 import '../../../data/services/local_storage_service.dart';
@@ -673,7 +674,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
               Navigator.pop(ctx);
-              await ExpenseRepository().deleteAllData(); // Need to ensure Repository is accessible or instantiated
+              await context.read<ExpenseProvider>().deleteAllData();
               if (context.mounted) {
                 context.showSnackBar('Đã xóa toàn bộ dữ liệu');
                 // Optional: Restart app or navigate to Intro

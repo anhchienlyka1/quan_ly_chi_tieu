@@ -48,24 +48,14 @@ class AiAssistantService {
     return _instance!;
   }
 
-  static const String _apiKey = 'AIzaSyDkw6n8Id3r6SHZEsE-fnE8UrUCrwvQ8Gk';
-
   Future<void> _init() async {
     final prefs = await SharedPreferences.getInstance();
     final userKey = prefs.getString('gemini_api_key');
 
-    String keyToUse = '';
     if (userKey != null && userKey.isNotEmpty) {
-      keyToUse = userKey;
-    } else if (_apiKey.isNotEmpty &&
-        _apiKey != 'AIzaSyBt7W8xqVOGHhF_example_REPLACE_WITH_YOUR_KEY') {
-      keyToUse = _apiKey;
-    }
-
-    if (keyToUse.isNotEmpty) {
       _model = GenerativeModel(
         model: 'gemini-2.0-flash',
-        apiKey: keyToUse,
+        apiKey: userKey,
       );
     }
   }
@@ -392,7 +382,7 @@ TRIGGER: Vượt ngân sách tuần!
 - Đã chi: ${_formatMoney(trigger.data['spent'])} / Ngân sách tuần: ${_formatMoney(trigger.data['weeklyBudget'])}
 - Vượt ${trigger.data['overPercent']}%
 - Category cao nhất: ${trigger.data['topCategory']} (${_formatMoney(trigger.data['topCategoryAmount'])})
-TONE: Nhẹ nhàng cảnh báo, đề xuất cụ thể 1 cách tiết kiệm liên quan đến category cao nhất
+TONE: Trách móc vui nhộn, hài hước như bạn thân. Ví dụ: "Ơi, lại tiêu quá tay rồi! 😭" hoặc "Túi tiền kêu cứu rồi nè!". Sau đó đưa ra gợi ý cụ thể để cắt giảm, giữ giọng điệu nhẹ nhàng không phán xét.
 ''';
       case 'near_budget':
         triggerContext = '''
@@ -467,10 +457,10 @@ YÊU CẦU:
     switch (trigger.type) {
       case 'over_budget':
         return '$greeting Mình là Fin! 🤖\n\n'
-            '⚠️ Tuần này bạn đã chi ${_formatMoney(trigger.data['spent'])}, '
-            'vượt ngân sách tuần ${_formatMoney(trigger.data['weeklyBudget'])} rồi. '
-            'Mục "${trigger.data['topCategory']}" chiếm nhiều nhất. '
-            'Mình gợi ý bạn cắt giảm ở mục này nhé!';
+            'Ơi bạn ơi, tuần này chi ${_formatMoney(trigger.data['spent'])} rồi — '
+            'vượt ngân sách tuần ${_formatMoney(trigger.data['weeklyBudget'])} mất rồi nè! 😭 '
+            'Mục "${trigger.data['topCategory']}" là "thủ phạm" chính đó. '
+            'Túi tiền đang kêu cứu kìa! 😅';
       case 'near_budget':
         return '$greeting Mình là Fin! 🤖\n\n'
             '📊 Bạn đã dùng ${trigger.data['percentUsed']}% ngân sách tuần, '

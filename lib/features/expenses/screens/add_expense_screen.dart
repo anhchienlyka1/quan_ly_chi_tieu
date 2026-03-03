@@ -6,7 +6,9 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/currency_input_formatter.dart';
 import '../../../core/widgets/pro_button.dart';
 import '../../../core/widgets/pro_text_field.dart';
+import 'package:provider/provider.dart';
 import '../../../data/models/expense_model.dart';
+import '../../../data/providers/expense_provider.dart';
 import '../../../data/repositories/expense_repository.dart';
 
 class AddExpenseScreen extends StatefulWidget {
@@ -25,7 +27,6 @@ class AddExpenseScreen extends StatefulWidget {
 
 class _AddExpenseScreenState extends State<AddExpenseScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _repository = ExpenseRepository();
   
   late TextEditingController _amountController;
   late TextEditingController _titleController;
@@ -111,11 +112,12 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       );
 
       try {
+        final provider = context.read<ExpenseProvider>();
         // If it's editing an existing valid expense, update it.
         // If it's a mock expense or new, add it.
         if (_isEditing && !isMockId) {
           try {
-            await _repository.updateExpense(expense);
+            await provider.updateExpense(expense);
           } catch (e) {
             // If update fails because it's not found (404), try adding it as new
             if (e.toString().contains('404') || e.toString().contains('Status code: 404')) {
@@ -129,13 +131,13 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                  type: expense.type,
                  createdAt: expense.createdAt,
                );
-               await _repository.addExpense(newExpense);
+               await provider.addExpense(newExpense);
             } else {
               rethrow;
             }
           }
         } else {
-          await _repository.addExpense(expense);
+          await provider.addExpense(expense);
         }
 
         if (mounted) {

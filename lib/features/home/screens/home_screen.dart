@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gap/gap.dart';
+import 'package:provider/provider.dart';
 import '../../../app/routes/route_names.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/extensions/context_extensions.dart';
 import '../../../data/models/bank_notification_model.dart';
 import '../../../data/models/expense_model.dart';
-import '../../../data/repositories/expense_repository.dart';
+import '../../../data/providers/expense_provider.dart';
 import '../../../data/services/auto_expense_service.dart';
 import '../../../data/services/local_storage_service.dart';
 import '../../../data/services/budget_service.dart';
-import '../../../data/services/ai_assistant_service.dart';
 import '../../../data/services/mock_data_service.dart';
 import '../../budget/widgets/budget_progress_card.dart';
 import '../widgets/ai_assistant_popup.dart';
@@ -30,12 +30,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  final ExpenseRepository _repository = ExpenseRepository();
-  final BudgetService _budgetService = BudgetService();
-  List<ExpenseModel> _expenses = [];
-  BudgetProgress? _budgetProgress;
-  double _currentBalance = 0;
-  bool _isLoading = true;
   int _currentNavIndex = 0;
   bool _showAiFab = true;
   bool _hasUrgentAlert = false;
@@ -43,56 +37,38 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _loadExpenses();
+    _initServices();
   }
 
-  Future<void> _loadExpenses() async {
-    setState(() => _isLoading = true);
-    try {
-      final now = DateTime.now();
-      final expenses = await _repository.getExpensesByMonth(now.year, now.month);
-      expenses.sort((a, b) => b.date.compareTo(a.date));
-      
-      // Load budget progress
-      final budgetProgress = await _budgetService.calculateProgress(
-        expenses: expenses,
-      );
+  Future<void> _initServices() async {
+    // Initialize AutoExpenseService if needed
+    await AutoExpenseService.getInstance();
 
-      // Initialize AutoExpenseService if needed
-      await AutoExpenseService.getInstance();
-      
-      final storage = await LocalStorageService.getInstance();
-      final currentBalance = storage.getTotalBalance();
+    final storage = await LocalStorageService.getInstance();
+    if (mounted) {
+      final provider = context.read<ExpenseProvider>();
+      bool urgentAlert = false;
+      try {
+        urgentAlert = _checkUrgentTrigger(
+          provider.currentMonthExpenses,
+          provider.budgetProgress,
+        );
+      } catch (_) {}
 
-      if (mounted) {
-        // Check for urgent triggers
-        bool urgentAlert = false;
-        try {
-          urgentAlert = _checkUrgentTrigger(expenses, budgetProgress);
-        } catch (_) {}
-
-        setState(() {
-          _expenses = expenses;
-          _budgetProgress = budgetProgress;
-          _currentBalance = currentBalance;
-          _showAiFab = storage.isAiAssistantEnabled();
-          _hasUrgentAlert = urgentAlert;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      setState(() {
+        _showAiFab = storage.isAiAssistantEnabled();
+        _hasUrgentAlert = urgentAlert;
+      });
     }
   }
 
   void _showAiAssistantPopup() {
+    final provider = context.read<ExpenseProvider>();
     showAiAssistantSheet(
       context,
-      expenses: _expenses,
-      totalBalance: _currentBalance,
-      budgetProgress: _budgetProgress,
+      expenses: provider.currentMonthExpenses,
+      totalBalance: provider.totalBalance,
+      budgetProgress: provider.budgetProgress,
       onViewStatistics: () {
         Navigator.of(context).pushNamed(RouteNames.statistics);
       },
@@ -119,12 +95,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return weeklyBudget > 0 && thisWeekTotal > weeklyBudget * 0.8;
   }
 
-  double get _totalExpense =>
-      _expenses.where((e) => e.type == TransactionType.expense).fold<double>(0, (sum, e) => sum + e.amount);
-
-  double get _totalIncome =>
-      _expenses.where((e) => e.type == TransactionType.income).fold<double>(0, (sum, e) => sum + e.amount);
-
   String get _greeting {
     final hour = DateTime.now().hour;
     if (hour < 12) return 'Chào buổi sáng! ☀️';
@@ -134,44 +104,51 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Scaffold(
-          backgroundColor: context.theme.scaffoldBackgroundColor,
-          body: SafeArea(
-            child: RefreshIndicator(
-              onRefresh: _loadExpenses,
-              color: AppColors.primary,
-              child: CustomScrollView(
-                physics: const BouncingScrollPhysics(
-                  parent: AlwaysScrollableScrollPhysics(),
+    return Consumer<ExpenseProvider>(
+      builder: (context, provider, _) {
+        return Stack(
+          children: [
+            Scaffold(
+              backgroundColor: context.theme.scaffoldBackgroundColor,
+              body: SafeArea(
+                child: RefreshIndicator(
+                  onRefresh: () async {
+                    await provider.refresh();
+                    await _initServices();
+                  },
+                  color: AppColors.primary,
+                  child: CustomScrollView(
+                    physics: const BouncingScrollPhysics(
+                      parent: AlwaysScrollableScrollPhysics(),
+                    ),
+                    slivers: [
+                      // Custom App Bar
+                      SliverToBoxAdapter(
+                        child: _buildHeader(context),
+                      ),
+
+                      // Content
+                      SliverToBoxAdapter(
+                        child: provider.isLoading
+                            ? _buildLoadingState(context)
+                            : _buildContent(context, provider),
+                      ),
+                    ],
+                  ),
                 ),
-                slivers: [
-                  // Custom App Bar
-                  SliverToBoxAdapter(
-                    child: _buildHeader(context),
-                  ),
-
-                  // Content
-                  SliverToBoxAdapter(
-                    child: _isLoading
-                        ? _buildLoadingState(context)
-                        : _buildContent(context),
-                  ),
-                ],
               ),
+              bottomNavigationBar: _buildBottomNav(context),
             ),
-          ),
-          bottomNavigationBar: _buildBottomNav(context),
-        ),
 
-        // Draggable AI Assistant FAB — topmost layer
-        if (_showAiFab)
-          DraggableAiFab(
-            onTap: _showAiAssistantPopup,
-            showAlertDot: _hasUrgentAlert,
-          ),
-      ],
+            // Draggable AI Assistant FAB — topmost layer
+            if (_showAiFab)
+              DraggableAiFab(
+                onTap: _showAiAssistantPopup,
+                showAlertDot: _hasUrgentAlert,
+              ),
+          ],
+        );
+      },
     );
   }
 
@@ -181,40 +158,51 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Greeting and subtitle
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                _greeting,
-                style: context.textTheme.bodyMedium?.copyWith(
-                  color: context.colorScheme.onSurface.withOpacity(0.6),
+          // Greeting and subtitle — long-press to seed mock data (debug)
+          GestureDetector(
+            onLongPress: () async {
+              HapticFeedback.heavyImpact();
+              try {
+                await MockDataService.seedAll();
+                if (mounted) {
+                  await context.read<ExpenseProvider>().refresh();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('✅ Mock data loaded!'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('❌ Error: $e'),
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                }
+              }
+            },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _greeting,
+                  style: context.textTheme.bodyMedium?.copyWith(
+                    color: context.colorScheme.onSurface.withOpacity(0.6),
+                  ),
                 ),
-              ),
-              const Gap(4),
-              GestureDetector(
-                onLongPress: () async {
-                  HapticFeedback.heavyImpact();
-                  await MockDataService.seedAll();
-                  await _loadExpenses();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('✅ Mock data loaded!'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  }
-                },
-                child: Text(
+                const Gap(4),
+                Text(
                   'Quản lý tài chính',
                   style: context.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: context.colorScheme.onSurface,
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           )
               .animate()
               .fade(duration: 500.ms)
@@ -243,11 +231,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         HapticFeedback.lightImpact();
         showNotificationBottomSheet(
           context,
-          onTransactionProcessed: _loadExpenses,
+          onTransactionProcessed: () => context.read<ExpenseProvider>().refresh(),
         ).then((shouldNavigate) {
           if (shouldNavigate) {
             context.pushNamed(RouteNames.autoExpense).then((_) {
-              _loadExpenses();
+              context.read<ExpenseProvider>().refresh();
               setState(() {}); // Refresh notification badge
             });
           }
@@ -435,7 +423,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildContent(BuildContext context) {
+  Widget _buildContent(BuildContext context, ExpenseProvider provider) {
+    final expenses = provider.currentMonthExpenses;
+    final budgetProgress = provider.budgetProgress;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 100),
       child: Column(
@@ -443,9 +434,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         children: [
           // Balance Card
           BalanceCard(
-            totalBalance: _currentBalance != 0 ? _currentBalance : (_totalIncome - _totalExpense),
-            totalIncome: _totalIncome,
-            totalExpense: _totalExpense,
+            totalBalance: provider.totalBalance,
+            totalIncome: provider.totalIncome,
+            totalExpense: provider.totalExpense,
             monthLabel:
                 'Tháng ${DateTime.now().month}/${DateTime.now().year}',
             onTap: () => context.pushNamed(RouteNames.expenseList),
@@ -461,9 +452,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           const Gap(28),
 
           // Budget Progress Card
-          if (_budgetProgress != null)
+          if (budgetProgress != null)
             BudgetProgressCard(
-              progress: _budgetProgress!,
+              progress: budgetProgress,
               onTap: () => _navigateAndRefresh(RouteNames.budget),
             )
                 .animate()
@@ -473,13 +464,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
           // Quick Shortcuts
           QuickShortcuts(
-            onActionCompleted: _loadExpenses,
+            onActionCompleted: () => context.read<ExpenseProvider>().refresh(),
           ),
           const Gap(28),
 
           // Recent Transactions
           RecentTransactionsList(
-            transactions: _expenses.take(5).toList(),
+            transactions: expenses.take(5).toList(),
             onViewAll: () => _navigateAndRefresh(RouteNames.expenseList),
           ),
           const Gap(16),
@@ -591,10 +582,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             break;
         }
         
-        // Reset to Home tab and refresh AI setting when returning
+        // Reset to Home tab and refresh when returning
         if (mounted && index != 0) {
           setState(() => _currentNavIndex = 0);
-          // Refresh AI FAB visibility in case user changed setting
+          // Refresh provider + AI FAB visibility
+          context.read<ExpenseProvider>().refresh();
           final storage = await LocalStorageService.getInstance();
           if (mounted) {
             setState(() => _showAiFab = storage.isAiAssistantEnabled());
@@ -643,6 +635,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Future<void> _navigateAndRefresh(String routeName) async {
     await context.pushNamed(routeName);
-    _loadExpenses();
+    context.read<ExpenseProvider>().refresh();
   }
 }

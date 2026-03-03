@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gap/gap.dart';
+import 'package:provider/provider.dart';
 import '../../../app/routes/route_names.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/extensions/context_extensions.dart';
 import '../../../core/extensions/number_extensions.dart';
 import '../../../core/extensions/date_extensions.dart';
 import '../../../data/models/expense_model.dart';
-import '../../../data/repositories/expense_repository.dart';
+import '../../../data/providers/expense_provider.dart';
 import '../widgets/expense_item.dart';
 import '../screens/expense_search_screen.dart';
 
@@ -21,9 +22,6 @@ class ExpenseListScreen extends StatefulWidget {
 
 class _ExpenseListScreenState extends State<ExpenseListScreen>
     with TickerProviderStateMixin {
-  final ExpenseRepository _repository = ExpenseRepository();
-  List<ExpenseModel> _allExpenses = [];
-  bool _isLoading = true;
   TransactionType? _filterType; // null = All
 
   late final TabController _tabController;
@@ -49,7 +47,6 @@ class _ExpenseListScreenState extends State<ExpenseListScreen>
         });
       }
     });
-    _loadExpenses();
   }
 
   @override
@@ -58,41 +55,15 @@ class _ExpenseListScreenState extends State<ExpenseListScreen>
     super.dispose();
   }
 
-  Future<void> _loadExpenses() async {
-    setState(() => _isLoading = true);
-    try {
-      final expenses = await _repository.getAllExpenses();
-      expenses.sort((a, b) => b.date.compareTo(a.date));
-      if (mounted) {
-        setState(() {
-          _allExpenses = expenses;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
+  List<ExpenseModel> _getFilteredExpenses(List<ExpenseModel> allExpenses) {
+    if (_filterType == null) return allExpenses;
+    return allExpenses.where((e) => e.type == _filterType).toList();
   }
-
-  List<ExpenseModel> get _filteredExpenses {
-    if (_filterType == null) return _allExpenses;
-    return _allExpenses.where((e) => e.type == _filterType).toList();
-  }
-
-  double get _totalIncome => _allExpenses
-      .where((e) => e.type == TransactionType.income)
-      .fold<double>(0, (sum, e) => sum + e.amount);
-
-  double get _totalExpense => _allExpenses
-      .where((e) => e.type == TransactionType.expense)
-      .fold<double>(0, (sum, e) => sum + e.amount);
 
   /// Group expenses by date (day)
-  Map<String, List<ExpenseModel>> get _groupedExpenses {
+  Map<String, List<ExpenseModel>> _getGroupedExpenses(List<ExpenseModel> filtered) {
     final map = <String, List<ExpenseModel>>{};
-    for (final e in _filteredExpenses) {
+    for (final e in filtered) {
       final key = e.date.toShortDate;
       map.putIfAbsent(key, () => []).add(e);
     }
@@ -102,8 +73,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen>
   Future<void> _deleteExpense(ExpenseModel expense) async {
     if (expense.id == null) return;
     try {
-      await _repository.deleteExpense(expense.id!);
-      await _loadExpenses();
+      await context.read<ExpenseProvider>().deleteExpense(expense.id!);
       if (mounted) {
         context.showSnackBar('Đã xóa "${expense.title}"');
       }
@@ -114,13 +84,13 @@ class _ExpenseListScreenState extends State<ExpenseListScreen>
     }
   }
   
-  void _navigateToSearch() {
+  void _navigateToSearch(List<ExpenseModel> allExpenses) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => ExpenseSearchScreen(
-          allExpenses: _allExpenses,
+          allExpenses: allExpenses,
           onDelete: _deleteExpense,
-          onUpdate: _loadExpenses,
+          onUpdate: () => context.read<ExpenseProvider>().refresh(),
         ),
       ),
     );
@@ -128,47 +98,61 @@ class _ExpenseListScreenState extends State<ExpenseListScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: context.theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _loadExpenses,
-          color: AppColors.primary,
-          child: CustomScrollView(
-            physics: const BouncingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
+    return Consumer<ExpenseProvider>(
+      builder: (context, provider, _) {
+        final allExpenses = provider.currentMonthExpenses;
+        final filteredExpenses = _getFilteredExpenses(allExpenses);
+        final totalIncome = provider.totalIncome;
+        final totalExpense = provider.totalExpense;
+
+        return Scaffold(
+          backgroundColor: context.theme.scaffoldBackgroundColor,
+          body: SafeArea(
+            child: RefreshIndicator(
+              onRefresh: () => provider.refresh(),
+              color: AppColors.primary,
+              child: CustomScrollView(
+                physics: const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics(),
+                ),
+                slivers: [
+                  // Custom AppBar
+                  SliverToBoxAdapter(child: _buildAppBar(context, allExpenses)),
+                  // Summary Card
+                  SliverToBoxAdapter(
+                    child: _buildSummaryCard(context, totalIncome, totalExpense),
+                  ),
+                  // Filter Tabs
+                  SliverToBoxAdapter(
+                    child: _buildFilterTabs(context, allExpenses),
+                  ),
+                  // Content
+                  if (provider.isLoading)
+                    SliverToBoxAdapter(child: _buildLoadingState(context))
+                  else if (filteredExpenses.isEmpty)
+                    SliverToBoxAdapter(child: _buildEmptyState(context))
+                  else
+                    SliverToBoxAdapter(
+                      child: _buildTransactionList(context, filteredExpenses),
+                    ),
+                  // Bottom spacing
+                  const SliverToBoxAdapter(child: Gap(100)),
+                ],
+              ),
             ),
-            slivers: [
-              // Custom AppBar
-              SliverToBoxAdapter(child: _buildAppBar(context)),
-              // Summary Card
-              SliverToBoxAdapter(child: _buildSummaryCard(context)),
-              // Filter Tabs
-              SliverToBoxAdapter(child: _buildFilterTabs(context)),
-              // Content
-              if (_isLoading)
-                SliverToBoxAdapter(child: _buildLoadingState(context))
-              else if (_filteredExpenses.isEmpty)
-                SliverToBoxAdapter(child: _buildEmptyState(context))
-              else
-                SliverToBoxAdapter(child: _buildTransactionList(context)),
-              // Bottom spacing
-              const SliverToBoxAdapter(child: Gap(100)),
-            ],
           ),
-        ),
-      ),
-      floatingActionButton: _buildFAB(context),
+          floatingActionButton: _buildFAB(context),
+        );
+      },
     );
   }
 
-  Widget _buildAppBar(BuildContext context) {
+  Widget _buildAppBar(BuildContext context, List<ExpenseModel> allExpenses) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
       child: Row(
         children: [
-          const Gap(8), // Add some spacing if needed or just remove
-
+          const Gap(8),
           Text(
             'Danh sách giao dịch',
             style: context.textTheme.titleLarge?.copyWith(
@@ -179,7 +163,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen>
           _buildHeaderIconButton(
             context,
             icon: Icons.search_rounded,
-            onTap: _navigateToSearch,
+            onTap: () => _navigateToSearch(allExpenses),
           ),
         ],
       ),
@@ -224,8 +208,12 @@ class _ExpenseListScreenState extends State<ExpenseListScreen>
     );
   }
 
-  Widget _buildSummaryCard(BuildContext context) {
-    final balance = _totalIncome - _totalExpense;
+  Widget _buildSummaryCard(
+    BuildContext context,
+    double totalIncome,
+    double totalExpense,
+  ) {
+    final balance = totalIncome - totalExpense;
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
       child: Container(
@@ -266,7 +254,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen>
                     context,
                     icon: Icons.arrow_downward_rounded,
                     label: 'Thu nhập',
-                    amount: _totalIncome,
+                    amount: totalIncome,
                     color: const Color(0xFF2ECC71),
                   ),
                 ),
@@ -280,7 +268,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen>
                     context,
                     icon: Icons.arrow_upward_rounded,
                     label: 'Chi tiêu',
-                    amount: _totalExpense,
+                    amount: totalExpense,
                     color: const Color(0xFFFF6B6B),
                   ),
                 ),
@@ -338,7 +326,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen>
     );
   }
 
-  Widget _buildFilterTabs(BuildContext context) {
+  Widget _buildFilterTabs(BuildContext context, List<ExpenseModel> allExpenses) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 4),
       child: Container(
@@ -383,7 +371,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen>
                   children: [
                     const Icon(Icons.list_rounded, size: 16),
                     const Gap(4),
-                    Text('Tất cả (${_allExpenses.length})'),
+                    Text('Tất cả (${allExpenses.length})'),
                   ],
                 ),
               ),
@@ -398,7 +386,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen>
                     const Icon(Icons.arrow_upward_rounded, size: 16),
                     const Gap(4),
                     Text(
-                      'Chi (${_allExpenses.where((e) => e.type == TransactionType.expense).length})',
+                      'Chi (${allExpenses.where((e) => e.type == TransactionType.expense).length})',
                     ),
                   ],
                 ),
@@ -414,7 +402,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen>
                     const Icon(Icons.arrow_downward_rounded, size: 16),
                     const Gap(4),
                     Text(
-                      'Thu (${_allExpenses.where((e) => e.type == TransactionType.income).length})',
+                      'Thu (${allExpenses.where((e) => e.type == TransactionType.income).length})',
                     ),
                   ],
                 ),
@@ -428,8 +416,11 @@ class _ExpenseListScreenState extends State<ExpenseListScreen>
         .fade(duration: 400.ms, delay: 200.ms);
   }
 
-  Widget _buildTransactionList(BuildContext context) {
-    final grouped = _groupedExpenses;
+  Widget _buildTransactionList(
+    BuildContext context,
+    List<ExpenseModel> filteredExpenses,
+  ) {
+    final grouped = _getGroupedExpenses(filteredExpenses);
     final keys = grouped.keys.toList();
     int animIndex = 0;
 
@@ -489,8 +480,8 @@ class _ExpenseListScreenState extends State<ExpenseListScreen>
                       RouteNames.addExpense,
                       arguments: expense,
                     );
-                    if (result == true) {
-                      _loadExpenses();
+                    if (result == true && mounted) {
+                      context.read<ExpenseProvider>().refresh();
                     }
                   },
                 );
@@ -579,8 +570,10 @@ class _ExpenseListScreenState extends State<ExpenseListScreen>
     return GestureDetector(
       onTap: () async {
         HapticFeedback.mediumImpact();
-        await context.pushNamed(RouteNames.addExpense);
-        _loadExpenses();
+        final result = await context.pushNamed(RouteNames.addExpense);
+        if (result == true && mounted) {
+          context.read<ExpenseProvider>().refresh();
+        }
       },
       child: Container(
         padding: const EdgeInsets.all(16),

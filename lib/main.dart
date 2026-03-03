@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'app/app.dart';
+import 'data/providers/expense_provider.dart';
 import 'theme/theme_provider.dart';
 
 /// Global ThemeProvider instance accessible throughout the app.
@@ -27,5 +29,10 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  runApp(const QuanLyChiTieuApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => ExpenseProvider()..loadExpenses(),
+      child: const QuanLyChiTieuApp(),
+    ),
+  );
 }

@@ -3,12 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gap/gap.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/extensions/context_extensions.dart';
 import '../../../core/extensions/number_extensions.dart';
 import '../../../data/models/expense_model.dart';
-import '../../../data/repositories/expense_repository.dart';
+import '../../../data/providers/expense_provider.dart';
 import '../../../data/services/receipt_scanner_service.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../data/services/transaction_categorizer_service.dart';
@@ -24,7 +25,6 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
     with TickerProviderStateMixin {
   final ImagePicker _picker = ImagePicker();
   final MobileScannerController _qrController = MobileScannerController();
-  final ExpenseRepository _repository = ExpenseRepository();
 
   // State
   Uint8List? _imageBytes;
@@ -187,7 +187,7 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
             : _noteController.text.trim(),
       );
 
-      await _repository.addExpense(expense);
+      await context.read<ExpenseProvider>().addExpense(expense);
 
       if (!mounted) return;
       HapticFeedback.mediumImpact();
