@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'app/app.dart';
+import 'core/constants/env_config.dart';
 import 'data/providers/expense_provider.dart';
 import 'theme/theme_provider.dart';
 
@@ -11,6 +12,9 @@ final ThemeProvider themeProvider = ThemeProvider();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables from .env file
+  await EnvConfig.load();
 
   // Initialize theme from stored preferences
   await themeProvider.init();

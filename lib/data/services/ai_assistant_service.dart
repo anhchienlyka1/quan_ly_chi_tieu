@@ -1,5 +1,6 @@
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/constants/env_config.dart';
 import '../models/expense_model.dart';
 
 /// Tin nhắn trong cuộc hội thoại AI
@@ -54,7 +55,7 @@ class AiAssistantService {
 
     if (userKey != null && userKey.isNotEmpty) {
       _model = GenerativeModel(
-        model: 'gemini-2.0-flash',
+        model: EnvConfig.geminiModel,
         apiKey: userKey,
       );
     }

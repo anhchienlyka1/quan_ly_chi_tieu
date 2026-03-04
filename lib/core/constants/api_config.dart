@@ -1,17 +1,17 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'env_config.dart';
 
 /// Configuration for API endpoints and network settings.
 /// Automatically handles localhost variations between iOS Simulator and Android Emulator.
 class ApiConfig {
   ApiConfig._();
 
-  // Port of your local server (e.g., Node.js, JSON Server, Python)
-  static const int _port = 3000;
+  // Port of your local server — loaded from .env (API_PORT)
+  static int get _port => EnvConfig.apiPort;
 
-  // For physical device testing, replace this with your computer's LAN IP
-  // e.g., '192.168.1.5'
-  static const String _lanIp = '192.168.1.5';
+  // LAN IP for physical device testing — loaded from .env (LAN_IP)
+  static String get _lanIp => EnvConfig.lanIp;
 
   /// Base URL that adapts to the platform.
   static String get baseUrl {

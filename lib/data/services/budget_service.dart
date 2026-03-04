@@ -57,15 +57,19 @@ class BudgetService {
 
     // Filter only this month's expenses (not income)
     final monthExpenses = expenses
-        .where((e) =>
-            e.type == TransactionType.expense &&
-            e.date.year == now.year &&
-            e.date.month == now.month)
+        .where(
+          (e) =>
+              e.type == TransactionType.expense &&
+              e.date.year == now.year &&
+              e.date.month == now.month,
+        )
         .toList();
 
     // Total spent
-    final totalSpent =
-        monthExpenses.fold<double>(0, (sum, e) => sum + e.amount);
+    final totalSpent = monthExpenses.fold<double>(
+      0,
+      (sum, e) => sum + e.amount,
+    );
 
     // Per-category spending
     final categorySpending = <ExpenseCategory, double>{};
@@ -94,11 +98,12 @@ class BudgetService {
     );
   }
 
-  /// Delete budget for a specific month
+  /// Delete budget for a specific month (also clears default)
   Future<void> deleteBudget(int year, int month) async {
     final prefs = await SharedPreferences.getInstance();
     final monthKey = '$year-${month.toString().padLeft(2, '0')}';
     await prefs.remove('$_budgetKeyPrefix$monthKey');
+    await prefs.remove(_defaultBudgetKey);
   }
 
   /// Clear all budget data

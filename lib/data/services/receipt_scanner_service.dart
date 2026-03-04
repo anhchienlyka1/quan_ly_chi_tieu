@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import '../../core/constants/env_config.dart';
 import '../models/expense_model.dart';
 
 /// Model representing the extracted receipt data from AI.
@@ -145,15 +146,15 @@ class ReceiptItem {
 
 /// Service for scanning receipts using Gemini AI Vision.
 class ReceiptScannerService {
-  static const String _defaultApiKey = 'YOUR_GEMINI_API_KEY';
+  static String get _defaultApiKey => EnvConfig.geminiApiKey;
   
   GenerativeModel? _model;
 
   ReceiptScannerService({String? apiKey}) {
     final key = apiKey ?? _defaultApiKey;
-    if (key != _defaultApiKey && key.isNotEmpty) {
+    if (key.isNotEmpty) {
       _model = GenerativeModel(
-        model: 'gemini-2.0-flash',
+        model: EnvConfig.geminiModel,
         apiKey: key,
       );
     }

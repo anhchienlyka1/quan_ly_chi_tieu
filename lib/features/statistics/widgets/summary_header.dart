@@ -6,12 +6,14 @@ import '../../../core/extensions/number_extensions.dart';
 class SummaryHeader extends StatelessWidget {
   final double income;
   final double expense;
+  final double savingsRate; // -1.0 to 1.0
   final DateTime date;
 
   const SummaryHeader({
     super.key,
     required this.income,
     required this.expense,
+    required this.savingsRate,
     required this.date,
   });
 
@@ -19,14 +21,24 @@ class SummaryHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isPositiveSaving = savingsRate >= 0;
+    final savingsColor = isPositiveSaving
+        ? const Color(0xFF4ADE80)
+        : const Color(0xFFFB7185);
+    final savingsPct = (savingsRate * 100).abs().toStringAsFixed(0);
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            context.isDarkMode ? const Color(0xFF2C2C3E) : const Color(0xFF2E2E3E),
-            context.isDarkMode ? const Color(0xFF1E1E2C) : const Color(0xFF1A1A2E),
+            context.isDarkMode
+                ? const Color(0xFF2C2C3E)
+                : const Color(0xFF2E2E3E),
+            context.isDarkMode
+                ? const Color(0xFF1E1E2C)
+                : const Color(0xFF1A1A2E),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -58,7 +70,46 @@ class SummaryHeader extends StatelessWidget {
               letterSpacing: -0.5,
             ),
           ),
-          const Gap(24),
+          const Gap(16),
+
+          // Savings Rate Badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            decoration: BoxDecoration(
+              color: savingsColor.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: savingsColor.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isPositiveSaving
+                      ? Icons.savings_rounded
+                      : Icons.warning_amber_rounded,
+                  color: savingsColor,
+                  size: 13,
+                ),
+                const Gap(4),
+                Text(
+                  income > 0
+                      ? 'Tiết kiệm: ${isPositiveSaving ? '' : '-'}$savingsPct%'
+                      : 'Chưa có thu nhập',
+                  style: context.textTheme.labelSmall?.copyWith(
+                    color: savingsColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const Gap(20),
+
           Row(
             children: [
               Expanded(
@@ -66,7 +117,7 @@ class SummaryHeader extends StatelessWidget {
                   context,
                   label: 'Thu vào',
                   amount: income,
-                  color: const Color(0xFF4ADE80), // Green
+                  color: const Color(0xFF4ADE80),
                   icon: Icons.arrow_downward_rounded,
                 ),
               ),
@@ -80,7 +131,7 @@ class SummaryHeader extends StatelessWidget {
                   context,
                   label: 'Chi ra',
                   amount: expense,
-                  color: const Color(0xFFFB7185), // Red
+                  color: const Color(0xFFFB7185),
                   icon: Icons.arrow_upward_rounded,
                 ),
               ),

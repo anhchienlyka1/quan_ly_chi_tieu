@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/constants/env_config.dart';
 import '../models/expense_model.dart';
 
 /// Service dùng Gemini AI để phân tích nội dung chuyển khoản ngân hàng.
@@ -20,8 +21,8 @@ class TransactionCategorizerService {
     return _instance!;
   }
 
-  // Hardcoded API key for auto-expense feature
-  static const String _apiKey = 'AIzaSyDkw6n8Id3r6SHZEsE-fnE8UrUCrwvQ8Gk';
+  // Default API key loaded from .env file
+  static String get _apiKey => EnvConfig.geminiApiKey;
   
   Future<void> _init() async {
     // Try to get API key from SharedPreferences first
@@ -31,14 +32,13 @@ class TransactionCategorizerService {
     String keyToUse = '';
     if (userKey != null && userKey.isNotEmpty) {
       keyToUse = userKey;
-    } else if (_apiKey.isNotEmpty &&
-        _apiKey != 'AIzaSyBt7W8xqVOGHhF_example_REPLACE_WITH_YOUR_KEY') {
+    } else if (_apiKey.isNotEmpty) {
       keyToUse = _apiKey;
     }
 
     if (keyToUse.isNotEmpty) {
       _model = GenerativeModel(
-        model: 'gemini-2.0-flash',
+        model: EnvConfig.geminiModel,
         apiKey: keyToUse,
       );
     }

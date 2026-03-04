@@ -21,7 +21,6 @@ import '../widgets/notification_bottom_sheet.dart';
 import '../widgets/quick_shortcuts.dart';
 import '../widgets/recent_transactions_list.dart';
 
-
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -79,16 +78,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   /// Quick check if there's an urgent trigger (P0/P1) — runs locally, no AI call
-  bool _checkUrgentTrigger(List<ExpenseModel> expenses, BudgetProgress? budgetProgress) {
+  bool _checkUrgentTrigger(
+    List<ExpenseModel> expenses,
+    BudgetProgress? budgetProgress,
+  ) {
     if (budgetProgress == null || !budgetProgress.budget.isSet) return false;
 
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-    final startOfWeekDate = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+    final startOfWeekDate = DateTime(
+      startOfWeek.year,
+      startOfWeek.month,
+      startOfWeek.day,
+    );
 
     final thisWeekTotal = expenses
-        .where((e) => e.type == TransactionType.expense &&
-            e.date.isAfter(startOfWeekDate.subtract(const Duration(seconds: 1))))
+        .where(
+          (e) =>
+              e.type == TransactionType.expense &&
+              e.date.isAfter(
+                startOfWeekDate.subtract(const Duration(seconds: 1)),
+              ),
+        )
         .fold<double>(0, (s, e) => s + e.amount);
 
     final weeklyBudget = budgetProgress.budget.totalBudget / 4;
@@ -123,9 +134,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                     slivers: [
                       // Custom App Bar
-                      SliverToBoxAdapter(
-                        child: _buildHeader(context),
-                      ),
+                      SliverToBoxAdapter(child: _buildHeader(context)),
 
                       // Content
                       SliverToBoxAdapter(
@@ -160,50 +169,50 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         children: [
           // Greeting and subtitle — long-press to seed mock data (debug)
           GestureDetector(
-            onLongPress: () async {
-              HapticFeedback.heavyImpact();
-              try {
-                await MockDataService.seedAll();
-                if (mounted) {
-                  await context.read<ExpenseProvider>().refresh();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('✅ Mock data loaded!'),
-                      duration: Duration(seconds: 2),
+                onLongPress: () async {
+                  HapticFeedback.heavyImpact();
+                  try {
+                    await MockDataService.seedAll();
+                    if (mounted) {
+                      await context.read<ExpenseProvider>().refresh();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('✅ Mock data loaded!'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('❌ Error: $e'),
+                          duration: const Duration(seconds: 3),
+                        ),
+                      );
+                    }
+                  }
+                },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _greeting,
+                      style: context.textTheme.bodyMedium?.copyWith(
+                        color: context.colorScheme.onSurface.withOpacity(0.6),
+                      ),
                     ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('❌ Error: $e'),
-                      duration: const Duration(seconds: 3),
+                    const Gap(4),
+                    Text(
+                      'Quản lý tài chính',
+                      style: context.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: context.colorScheme.onSurface,
+                      ),
                     ),
-                  );
-                }
-              }
-            },
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _greeting,
-                  style: context.textTheme.bodyMedium?.copyWith(
-                    color: context.colorScheme.onSurface.withOpacity(0.6),
-                  ),
+                  ],
                 ),
-                const Gap(4),
-                Text(
-                  'Quản lý tài chính',
-                  style: context.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: context.colorScheme.onSurface,
-                  ),
-                ),
-              ],
-            ),
-          )
+              )
               .animate()
               .fade(duration: 500.ms)
               .slideX(begin: -0.1, end: 0, curve: Curves.easeOutCubic),
@@ -214,7 +223,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             builder: (context, snapshot) {
               final pendingCount =
                   AutoExpenseService.instance?.pendingNotifications.length ?? 0;
-              
+
               return _buildNotificationIcon(context, pendingCount);
             },
           ).animate().fade(duration: 500.ms, delay: 100.ms),
@@ -231,7 +240,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         HapticFeedback.lightImpact();
         showNotificationBottomSheet(
           context,
-          onTransactionProcessed: () => context.read<ExpenseProvider>().refresh(),
+          onTransactionProcessed: () =>
+              context.read<ExpenseProvider>().refresh(),
         ).then((shouldNavigate) {
           if (shouldNavigate) {
             context.pushNamed(RouteNames.autoExpense).then((_) {
@@ -247,25 +257,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           // Outer glow ring (visible when has notifications)
           if (hasNotifications)
             Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withOpacity(0.25),
-                      blurRadius: 12,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
-              )
-                  .animate(onPlay: (c) => c.repeat(reverse: true))
-                  .fade(
-                    begin: 0.5,
-                    end: 1.0,
-                    duration: 1500.ms,
-                    curve: Curves.easeInOut,
-                  ),
+              child:
+                  Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withOpacity(0.25),
+                              blurRadius: 12,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                      )
+                      .animate(onPlay: (c) => c.repeat(reverse: true))
+                      .fade(
+                        begin: 0.5,
+                        end: 1.0,
+                        duration: 1500.ms,
+                        curve: Curves.easeInOut,
+                      ),
             ),
 
           // Main icon container
@@ -274,11 +285,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             decoration: BoxDecoration(
               color: hasNotifications
                   ? (context.isDarkMode
-                      ? AppColors.primary.withOpacity(0.15)
-                      : AppColors.primary.withOpacity(0.08))
+                        ? AppColors.primary.withOpacity(0.15)
+                        : AppColors.primary.withOpacity(0.08))
                   : (context.isDarkMode
-                      ? context.theme.cardTheme.color
-                      : Colors.white),
+                        ? context.theme.cardTheme.color
+                        : Colors.white),
               borderRadius: BorderRadius.circular(14),
               border: hasNotifications
                   ? Border.all(
@@ -290,7 +301,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 BoxShadow(
                   color: hasNotifications
                       ? AppColors.primary.withOpacity(0.15)
-                      : Colors.black.withOpacity(context.isDarkMode ? 0.15 : 0.06),
+                      : Colors.black.withOpacity(
+                          context.isDarkMode ? 0.15 : 0.06,
+                        ),
                   blurRadius: hasNotifications ? 14 : 10,
                   offset: const Offset(0, 2),
                 ),
@@ -310,27 +323,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           // Animated bell shake when has notifications
           if (hasNotifications)
             Positioned.fill(
-              child: Container(
-                padding: const EdgeInsets.all(11),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(
-                  Icons.notifications_rounded,
-                  size: 22,
-                  color: AppColors.primary,
-                ),
-              )
-                  .animate(
-                    onPlay: (c) => c.repeat(),
-                    delay: 2000.ms,
-                  )
-                  .shake(
-                    hz: 4,
-                    rotation: 0.08,
-                    duration: 600.ms,
-                  )
-                  .then(delay: 3000.ms),
+              child:
+                  Container(
+                        padding: const EdgeInsets.all(11),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(
+                          Icons.notifications_rounded,
+                          size: 22,
+                          color: AppColors.primary,
+                        ),
+                      )
+                      .animate(onPlay: (c) => c.repeat(), delay: 2000.ms)
+                      .shake(hz: 4, rotation: 0.08, duration: 600.ms)
+                      .then(delay: 3000.ms),
             ),
 
           // Count Badge
@@ -338,44 +345,49 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             Positioned(
               top: -5,
               right: -5,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFFF6B6B), Color(0xFFEE5A24)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: context.isDarkMode
-                        ? AppColors.surfaceDark
-                        : Colors.white,
-                    width: 2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFEE5A24).withOpacity(0.4),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
+              child:
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 2,
                     ),
-                  ],
-                ),
-                child: Center(
-                  child: Text(
-                    pendingCount > 9 ? '9+' : '$pendingCount',
-                    style: context.textTheme.labelSmall?.copyWith(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      height: 1.1,
+                    constraints: const BoxConstraints(
+                      minWidth: 20,
+                      minHeight: 20,
                     ),
-                  ),
-                ),
-              )
-                  .animate()
-                  .scale(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFF6B6B), Color(0xFFEE5A24)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: context.isDarkMode
+                            ? AppColors.surfaceDark
+                            : Colors.white,
+                        width: 2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFEE5A24).withOpacity(0.4),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        pendingCount > 9 ? '9+' : '$pendingCount',
+                        style: context.textTheme.labelSmall?.copyWith(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          height: 1.1,
+                        ),
+                      ),
+                    ),
+                  ).animate().scale(
                     begin: const Offset(0, 0),
                     end: const Offset(1, 1),
                     duration: 400.ms,
@@ -394,28 +406,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         children: [
           // Shimmer balance card
           Container(
-            height: 200,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.primary.withOpacity(0.15),
-                  AppColors.primary.withOpacity(0.08),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(28),
-            ),
-          )
+                height: 200,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primary.withOpacity(0.15),
+                      AppColors.primary.withOpacity(0.08),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(28),
+                ),
+              )
               .animate(onPlay: (c) => c.repeat())
               .shimmer(duration: 1200.ms, color: Colors.white.withOpacity(0.3)),
           const Gap(24),
           // Shimmer chart
           Container(
-            height: 180,
-            decoration: BoxDecoration(
-              color: context.colorScheme.surface.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(24),
-            ),
-          )
+                height: 180,
+                decoration: BoxDecoration(
+                  color: context.colorScheme.surface.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+              )
               .animate(onPlay: (c) => c.repeat())
               .shimmer(duration: 1200.ms, color: Colors.white.withOpacity(0.3)),
         ],
@@ -434,13 +446,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         children: [
           // Balance Card
           BalanceCard(
-            totalBalance: provider.totalBalance,
-            totalIncome: provider.totalIncome,
-            totalExpense: provider.totalExpense,
-            monthLabel:
-                'Tháng ${DateTime.now().month}/${DateTime.now().year}',
-            onTap: () => context.pushNamed(RouteNames.expenseList),
-          )
+                totalBalance: provider.totalBalance,
+                totalIncome: provider.totalIncome,
+                totalExpense: provider.totalExpense,
+                monthLabel:
+                    'Tháng ${DateTime.now().month}/${DateTime.now().year}',
+                onTap: () => context.pushNamed(RouteNames.expenseList),
+              )
               .animate()
               .fade(duration: 600.ms, delay: 100.ms)
               .slideY(
@@ -454,9 +466,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           // Budget Progress Card
           if (budgetProgress != null)
             BudgetProgressCard(
-              progress: budgetProgress,
-              onTap: () => _navigateAndRefresh(RouteNames.budget),
-            )
+                  progress: budgetProgress,
+                  onTap: () => _navigateAndRefresh(RouteNames.budget),
+                )
                 .animate()
                 .fade(duration: 500.ms, delay: 200.ms)
                 .slideY(begin: 0.1, end: 0, curve: Curves.easeOutCubic),
@@ -485,24 +497,33 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         HapticFeedback.mediumImpact();
         // TODO: Implement voice to text feature
       },
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.primary,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withOpacity(0.4),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: const Icon(Icons.mic_rounded, color: Colors.white, size: 28),
-      )
-          .animate(delay: 600.ms)
-          .fade()
-          .scale(begin: const Offset(0.5, 0.5), curve: Curves.elasticOut, duration: 800.ms),
+      child:
+          Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.4),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.mic_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              )
+              .animate(delay: 600.ms)
+              .fade()
+              .scale(
+                begin: const Offset(0.5, 0.5),
+                curve: Curves.elasticOut,
+                duration: 800.ms,
+              ),
     );
   }
 
@@ -581,7 +602,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             await context.pushNamed(RouteNames.settings);
             break;
         }
-        
+
         // Reset to Home tab and refresh when returning
         if (mounted && index != 0) {
           setState(() => _currentNavIndex = 0);
@@ -599,7 +620,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         curve: Curves.easeOutCubic,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.primary.withOpacity(0.1) : Colors.transparent,
+          color: isActive
+              ? AppColors.primary.withOpacity(0.1)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(14),
         ),
         child: Column(
@@ -635,6 +658,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Future<void> _navigateAndRefresh(String routeName) async {
     await context.pushNamed(routeName);
-    context.read<ExpenseProvider>().refresh();
+    if (mounted) {
+      await context.read<ExpenseProvider>().refresh();
+    }
   }
 }

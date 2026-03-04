@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import '../../../core/extensions/context_extensions.dart';
 import '../../../core/extensions/number_extensions.dart';
+import '../../../core/utils/currency_input_formatter.dart';
 import '../../../data/models/budget_model.dart';
 import '../../../data/models/expense_model.dart';
 import '../../../data/services/budget_service.dart';
@@ -25,6 +26,7 @@ class _BudgetScreenState extends State<BudgetScreen>
   late Animation<double> _fadeAnimation;
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _hasBudget = false; // true khi đã có ngân sách được thiết lập
 
   // Expense-only categories
   final List<ExpenseCategory> _expenseCategories =
@@ -50,31 +52,77 @@ class _BudgetScreenState extends State<BudgetScreen>
     _loadBudget();
   }
 
+  /// Lấy số thuần từ text có thể có dấu chấm phân cách
+  double _parseAmount(String text) {
+    final clean = text.replaceAll(RegExp(r'[^0-9]'), '');
+    return double.tryParse(clean) ?? 0;
+  }
+
   Future<void> _loadBudget() async {
     final budget = await _budgetService.getCurrentMonthBudget();
     if (mounted) {
-      setState(() {
-        if (budget.totalBudget > 0) {
-          _totalBudgetController.text = budget.totalBudget.toInt().toString();
-        }
-        for (final entry in budget.categoryBudgets.entries) {
-          _categoryControllers[entry.key]?.text = entry.value
-              .toInt()
-              .toString();
-          _categoryEnabled[entry.key] = true;
-        }
-        _isLoading = false;
-      });
+      // Dùng CurrencyInputFormatter để format lại khi load
+      final formatter = CurrencyInputFormatter();
+      if (budget.totalBudget > 0) {
+        final raw = budget.totalBudget.toInt().toString();
+        _totalBudgetController.value = formatter.formatEditUpdate(
+          TextEditingValue.empty,
+          TextEditingValue(text: raw),
+        );
+      }
+      for (final entry in budget.categoryBudgets.entries) {
+        final raw = entry.value.toInt().toString();
+        _categoryControllers[entry.key]?.value = formatter.formatEditUpdate(
+          TextEditingValue.empty,
+          TextEditingValue(text: raw),
+        );
+        _categoryEnabled[entry.key] = true;
+      }
+      setState(() => _isLoading = false);
+      setState(() => _hasBudget = budget.totalBudget > 0);
       _animationController.forward();
     }
   }
 
+  /// Tính tổng ngân sách các danh mục đang được bật
+  double get _totalCategoryBudget {
+    double sum = 0;
+    for (final cat in _expenseCategories) {
+      if (_categoryEnabled[cat] == true) {
+        sum += _parseAmount(_categoryControllers[cat]?.text ?? '');
+      }
+    }
+    return sum;
+  }
+
   Future<void> _saveBudget() async {
-    final totalText = _totalBudgetController.text.replaceAll(',', '');
-    final total = double.tryParse(totalText) ?? 0;
+    final total = _parseAmount(_totalBudgetController.text);
 
     if (total <= 0) {
       context.showSnackBar('Vui lòng nhập ngân sách tổng', isError: true);
+      return;
+    }
+
+    // Validate từng danh mục không vượt ngân sách tổng
+    for (final cat in _expenseCategories) {
+      if (_categoryEnabled[cat] == true) {
+        final amount = _parseAmount(_categoryControllers[cat]?.text ?? '');
+        if (amount > total) {
+          context.showSnackBar(
+            'Ngân sách "${cat.label}" vượt quá ngân sách tổng!',
+            isError: true,
+          );
+          return;
+        }
+      }
+    }
+
+    // Validate tổng các danh mục không vượt ngân sách tổng
+    if (_totalCategoryBudget > total) {
+      context.showSnackBar(
+        'Tổng ngân sách các danh mục (${_totalCategoryBudget.toStringAsFixed(0)}₫) vượt quá ngân sách tổng!',
+        isError: true,
+      );
       return;
     }
 
@@ -83,8 +131,7 @@ class _BudgetScreenState extends State<BudgetScreen>
     final categoryBudgets = <ExpenseCategory, double>{};
     for (final cat in _expenseCategories) {
       if (_categoryEnabled[cat] == true) {
-        final text = _categoryControllers[cat]?.text.replaceAll(',', '') ?? '';
-        final amount = double.tryParse(text) ?? 0;
+        final amount = _parseAmount(_categoryControllers[cat]?.text ?? '');
         if (amount > 0) {
           categoryBudgets[cat] = amount;
         }
@@ -102,7 +149,46 @@ class _BudgetScreenState extends State<BudgetScreen>
       setState(() => _isSaving = false);
       HapticFeedback.mediumImpact();
       context.showSnackBar('Đã lưu ngân sách thành công! 🎉');
-      Navigator.of(context).pop(true); // Return true to indicate changes
+      Navigator.of(context).pop(true);
+    }
+  }
+
+  Future<void> _deleteBudget() async {
+    // Hiện confirm dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            Gap(12),
+            Text('Xoá ngân sách?'),
+          ],
+        ),
+        content: const Text(
+          'Thành động này sẽ xóa toàn bộ ngân sách của tháng này, bao gồm cả ngân sách danh mục. Bạn có chắc chắn không?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Xóa'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final now = DateTime.now();
+      await _budgetService.deleteBudget(now.year, now.month);
+      HapticFeedback.mediumImpact();
+      context.showSnackBar('Đã xóa ngân sách thành công');
+      Navigator.of(context).pop(true);
     }
   }
 
@@ -152,6 +238,10 @@ class _BudgetScreenState extends State<BudgetScreen>
 
                             // Save Button
                             _buildSaveButton(context),
+                            const Gap(12),
+
+                            // Delete Button (chỉ hiện khi đã có ngân sách)
+                            if (_hasBudget) _buildDeleteButton(context),
                             const Gap(20),
                           ],
                         ),
@@ -349,7 +439,7 @@ class _BudgetScreenState extends State<BudgetScreen>
             child: TextField(
               controller: _totalBudgetController,
               keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              inputFormatters: [CurrencyInputFormatter()],
               style: context.textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: const Color(0xFF10B981),
@@ -396,15 +486,19 @@ class _BudgetScreenState extends State<BudgetScreen>
   }
 
   Widget _buildQuickAmountChip(BuildContext context, int amount, String label) {
-    final currentText = _totalBudgetController.text.replaceAll(',', '');
-    final currentAmount = int.tryParse(currentText) ?? 0;
+    final currentAmount = _parseAmount(_totalBudgetController.text).toInt();
     final isSelected = currentAmount == amount;
 
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
+        final formatter = CurrencyInputFormatter();
+        final formatted = formatter.formatEditUpdate(
+          TextEditingValue.empty,
+          TextEditingValue(text: amount.toString()),
+        );
         setState(() {
-          _totalBudgetController.text = amount.toString();
+          _totalBudgetController.value = formatted;
         });
       },
       child: AnimatedContainer(
@@ -435,6 +529,10 @@ class _BudgetScreenState extends State<BudgetScreen>
   }
 
   Widget _buildCategoryBudgetsSection(BuildContext context) {
+    final total = _parseAmount(_totalBudgetController.text);
+    final catTotal = _totalCategoryBudget;
+    final isOverTotal = total > 0 && catTotal > total;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -470,6 +568,36 @@ class _BudgetScreenState extends State<BudgetScreen>
             color: context.colorScheme.onSurface.withOpacity(0.5),
           ),
         ),
+        if (isOverTotal) ...[
+          const Gap(8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.red.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.red,
+                  size: 16,
+                ),
+                const Gap(8),
+                Expanded(
+                  child: Text(
+                    'Tổng ngân sách con (${catTotal.toStringAsFixed(0)}₫) đang vượt quá ngân sách tổng!',
+                    style: context.textTheme.bodySmall?.copyWith(
+                      color: Colors.red,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const Gap(16),
 
         Container(
@@ -516,6 +644,11 @@ class _BudgetScreenState extends State<BudgetScreen>
   ) {
     final isEnabled = _categoryEnabled[category] ?? false;
 
+    // Kiểm tra nếu ngân sách danh mục vượt ngân sách tổng
+    final total = _parseAmount(_totalBudgetController.text);
+    final catAmount = _parseAmount(_categoryControllers[category]?.text ?? '');
+    final isOverLimit = isEnabled && total > 0 && catAmount > total;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
@@ -524,10 +657,16 @@ class _BudgetScreenState extends State<BudgetScreen>
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: category.color.withOpacity(0.15),
+              color: isOverLimit
+                  ? Colors.red.withOpacity(0.15)
+                  : category.color.withOpacity(0.15),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(category.icon, size: 20, color: category.color),
+            child: Icon(
+              category.icon,
+              size: 20,
+              color: isOverLimit ? Colors.red : category.color,
+            ),
           ),
           const Gap(14),
 
@@ -538,6 +677,7 @@ class _BudgetScreenState extends State<BudgetScreen>
               category.label,
               style: context.textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w600,
+                color: isOverLimit ? Colors.red : null,
               ),
             ),
           ),
@@ -550,28 +690,34 @@ class _BudgetScreenState extends State<BudgetScreen>
               decoration: BoxDecoration(
                 color: context.isDarkMode
                     ? Colors.white.withOpacity(0.05)
-                    : category.color.withOpacity(0.05),
+                    : (isOverLimit
+                          ? Colors.red.withOpacity(0.05)
+                          : category.color.withOpacity(0.05)),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: category.color.withOpacity(0.3),
+                  color: isOverLimit
+                      ? Colors.red.withOpacity(0.6)
+                      : category.color.withOpacity(0.3),
                   width: 1.5,
                 ),
               ),
               child: TextField(
                 controller: _categoryControllers[category],
                 keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: [CurrencyInputFormatter()],
                 textAlign: TextAlign.right,
                 style: context.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: category.color,
+                  color: isOverLimit ? Colors.red : category.color,
                 ),
                 decoration: InputDecoration(
                   hintText: '0',
                   suffixText: '₫',
                   suffixStyle: context.textTheme.bodySmall?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: category.color.withOpacity(0.7),
+                    color: isOverLimit
+                        ? Colors.red.withOpacity(0.7)
+                        : category.color.withOpacity(0.7),
                   ),
                   hintStyle: context.textTheme.bodySmall?.copyWith(
                     color: context.colorScheme.onSurface.withOpacity(0.3),
@@ -580,6 +726,7 @@ class _BudgetScreenState extends State<BudgetScreen>
                   isDense: true,
                   contentPadding: const EdgeInsets.symmetric(vertical: 8),
                 ),
+                onChanged: (_) => setState(() {}),
               ),
             ),
             const Gap(8), // Add some spacing before the switch
@@ -599,8 +746,10 @@ class _BudgetScreenState extends State<BudgetScreen>
                   }
                 });
               },
-              activeThumbColor: category.color,
-              activeTrackColor: category.color.withOpacity(0.3),
+              activeThumbColor: isOverLimit ? Colors.red : category.color,
+              activeTrackColor: isOverLimit
+                  ? Colors.red.withOpacity(0.3)
+                  : category.color.withOpacity(0.3),
             ),
           ),
         ],
@@ -609,8 +758,7 @@ class _BudgetScreenState extends State<BudgetScreen>
   }
 
   Widget _buildTipsCard(BuildContext context) {
-    final totalText = _totalBudgetController.text.replaceAll(',', '');
-    final total = double.tryParse(totalText) ?? 0;
+    final total = _parseAmount(_totalBudgetController.text);
 
     if (total <= 0) return const SizedBox.shrink();
 
@@ -686,8 +834,7 @@ class _BudgetScreenState extends State<BudgetScreen>
   ) {
     return Row(
       children: [
-        Text(emoji,
-            style: context.textTheme.bodyLarge?.copyWith(fontSize: 16)),
+        Text(emoji, style: context.textTheme.bodyLarge?.copyWith(fontSize: 16)),
         const Gap(10),
         Expanded(
           child: Text(
@@ -746,6 +893,38 @@ class _BudgetScreenState extends State<BudgetScreen>
               style: context.textTheme.titleMedium?.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeleteButton(BuildContext context) {
+    return GestureDetector(
+      onTap: _deleteBudget,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.red.withOpacity(0.4), width: 1.5),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.delete_outline_rounded,
+              color: Colors.red,
+              size: 22,
+            ),
+            const Gap(10),
+            Text(
+              'Xo\u00e1 ng\u00e2n s\u00e1ch',
+              style: context.textTheme.titleMedium?.copyWith(
+                color: Colors.red,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],

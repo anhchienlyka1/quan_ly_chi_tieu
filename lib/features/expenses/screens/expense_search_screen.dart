@@ -225,7 +225,7 @@ class _ExpenseSearchScreenState extends State<ExpenseSearchScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 24),
         scrollDirection: Axis.horizontal,
         itemCount: filters.length,
-        separatorBuilder: (_, __) => const Gap(8),
+        separatorBuilder: (_, _) => const Gap(8),
         itemBuilder: (context, index) {
           final filter = filters[index];
           final isSelected = _selectedFilter == filter['id'];

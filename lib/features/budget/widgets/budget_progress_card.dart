@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
-import '../../../app/routes/route_names.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/extensions/context_extensions.dart';
 import '../../../core/extensions/number_extensions.dart';
@@ -13,11 +12,7 @@ class BudgetProgressCard extends StatelessWidget {
   final BudgetProgress progress;
   final VoidCallback? onTap;
 
-  const BudgetProgressCard({
-    super.key,
-    required this.progress,
-    this.onTap,
-  });
+  const BudgetProgressCard({super.key, required this.progress, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -57,11 +52,7 @@ class BudgetProgressCard extends StatelessWidget {
                     color: _statusColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    _statusIcon,
-                    size: 20,
-                    color: _statusColor,
-                  ),
+                  child: Icon(_statusIcon, size: 20, color: _statusColor),
                 ),
                 const Gap(12),
                 Expanded(
@@ -86,8 +77,10 @@ class BudgetProgressCard extends StatelessWidget {
                 ),
                 // Percentage badge
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: _statusColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
@@ -155,9 +148,7 @@ class BudgetProgressCard extends StatelessWidget {
             // Category breakdown (if any)
             if (progress.categoryProgress.isNotEmpty) ...[
               const Gap(16),
-              Divider(
-                color: context.colorScheme.onSurface.withOpacity(0.05),
-              ),
+              Divider(color: context.colorScheme.onSurface.withOpacity(0.05)),
               const Gap(8),
               _buildCategoryBreakdown(context),
             ],
@@ -197,14 +188,8 @@ class BudgetProgressCard extends StatelessWidget {
                       colors: progress.isOverBudget
                           ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
                           : progress.isNearBudget
-                              ? [
-                                  const Color(0xFFF59E0B),
-                                  const Color(0xFFD97706)
-                                ]
-                              : [
-                                  const Color(0xFF10B981),
-                                  const Color(0xFF059669)
-                                ],
+                          ? [const Color(0xFFF59E0B), const Color(0xFFD97706)]
+                          : [const Color(0xFF10B981), const Color(0xFF059669)],
                     ),
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -212,7 +197,8 @@ class BudgetProgressCard extends StatelessWidget {
               ),
               // Month progress indicator line
               Positioned(
-                left: (MediaQuery.of(context).size.width - 80) *
+                left:
+                    (MediaQuery.of(context).size.width - 80) *
                     progress.monthProgress,
                 top: 0,
                 bottom: 0,
@@ -349,7 +335,7 @@ class BudgetProgressCard extends StatelessWidget {
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
-        context.pushNamed(RouteNames.budget);
+        onTap?.call();
       },
       child: Container(
         padding: const EdgeInsets.all(20),
@@ -358,14 +344,12 @@ class BudgetProgressCard extends StatelessWidget {
             colors: context.isDarkMode
                 ? [
                     const Color(0xFF1E293B),
-                    const Color(0xFF1E293B).withOpacity(0.8)
+                    const Color(0xFF1E293B).withOpacity(0.8),
                   ]
                 : [const Color(0xFFF0FDF4), const Color(0xFFDCFCE7)],
           ),
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: const Color(0xFF10B981).withOpacity(0.2),
-          ),
+          border: Border.all(color: const Color(0xFF10B981).withOpacity(0.2)),
         ),
         child: Row(
           children: [
