@@ -12,4 +12,6 @@ class RouteNames {
   static const String scanReceipt = '/scan-receipt';
   static const String budget = '/budget';
   static const String autoExpense = '/auto-expense';
+  static const String categoryManagement = '/category_management';
+  static const String aiHistory = '/ai_history';
 }

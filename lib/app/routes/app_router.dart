@@ -8,6 +8,7 @@ import '../../features/settings/screens/settings_screen.dart';
 import '../../features/scan_receipt/screens/scan_receipt_screen.dart';
 import '../../features/budget/screens/budget_screen.dart';
 import '../../features/settings/screens/auto_expense_screen.dart';
+import '../../features/home/screens/ai_chat_history_screen.dart';
 import '../../data/models/expense_model.dart';
 
 /// Centralized route management using onGenerateRoute.
@@ -38,10 +39,7 @@ class AppRouter {
         final expense = args is ExpenseModel ? args : null;
         final initialType = args is TransactionType ? args : null;
         return _buildRoute(
-          AddExpenseScreen(
-            expense: expense,
-            initialType: initialType,
-          ),
+          AddExpenseScreen(expense: expense, initialType: initialType),
           settings,
         );
 
@@ -57,15 +55,16 @@ class AppRouter {
       case RouteNames.budget:
         return _buildRoute(const BudgetScreen(), settings);
 
+      case RouteNames.aiHistory:
+        return _buildRoute(const AiChatHistoryScreen(), settings);
+
       case RouteNames.autoExpense:
         return _buildRoute(const AutoExpenseScreen(), settings);
 
       default:
         return _buildRoute(
           Scaffold(
-            body: Center(
-              child: Text('Không tìm thấy trang: ${settings.name}'),
-            ),
+            body: Center(child: Text('Không tìm thấy trang: ${settings.name}')),
           ),
           settings,
         );
@@ -74,9 +73,6 @@ class AppRouter {
 
   /// Helper to create consistent page transitions
   static Route<dynamic> _buildRoute(Widget page, RouteSettings settings) {
-    return MaterialPageRoute(
-      builder: (context) => page,
-      settings: settings,
-    );
+    return MaterialPageRoute(builder: (context) => page, settings: settings);
   }
 }

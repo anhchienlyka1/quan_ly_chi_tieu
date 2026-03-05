@@ -13,6 +13,7 @@ import '../../../data/providers/expense_provider.dart';
 import '../../../data/services/receipt_scanner_service.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../data/services/transaction_categorizer_service.dart';
+import '../../../core/constants/env_config.dart';
 
 class ScanReceiptScreen extends StatefulWidget {
   const ScanReceiptScreen({super.key});
@@ -57,7 +58,9 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
 
   Future<void> _initScanner() async {
     final prefs = await SharedPreferences.getInstance();
-    final apiKey = prefs.getString('gemini_api_key') ?? '';
+    final userKey = prefs.getString('gemini_api_key') ?? '';
+    // Fallback sang .env nếu user chưa nhập key
+    final apiKey = userKey.isNotEmpty ? userKey : EnvConfig.geminiApiKey;
     setState(() {
       _scanner = ReceiptScannerService(apiKey: apiKey);
     });
@@ -84,8 +87,11 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
       if (image == null) return;
 
       final bytes = await image.readAsBytes();
-      final mimeType = image.mimeType ?? 
-          (image.path.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg');
+      final mimeType =
+          image.mimeType ??
+          (image.path.toLowerCase().endsWith('.png')
+              ? 'image/png'
+              : 'image/jpeg');
 
       setState(() {
         _imageBytes = bytes;
@@ -214,7 +220,11 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
                 color: AppColors.primary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.key_rounded, color: AppColors.primary, size: 20),
+              child: const Icon(
+                Icons.key_rounded,
+                color: AppColors.primary,
+                size: 20,
+              ),
             ),
             const Gap(12),
             const Text('Cấu hình API Key'),
@@ -227,8 +237,8 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
             Text(
               'Nhập Google Gemini API Key để sử dụng tính năng quét hóa đơn.',
               style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.6),
-                  ),
+                color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.6),
+              ),
             ),
             const Gap(16),
             TextField(
@@ -256,10 +266,11 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
                 setState(() {
                   _scanner = ReceiptScannerService(apiKey: key);
                 });
-                
+
                 // Refresh categorizer service too
                 try {
-                  final categorizer = await TransactionCategorizerService.getInstance();
+                  final categorizer =
+                      await TransactionCategorizerService.getInstance();
                   await categorizer.reinitialize();
                 } catch (_) {}
 
@@ -293,12 +304,12 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
         child: _imageBytes == null
             ? _buildPickerState(context)
             : _isScanning
-                ? _buildScanningState(context)
-                : _error != null
-                    ? _buildErrorState(context)
-                    : _receiptData != null
-                        ? _buildResultState(context)
-                        : _buildPickerState(context),
+            ? _buildScanningState(context)
+            : _error != null
+            ? _buildErrorState(context)
+            : _receiptData != null
+            ? _buildResultState(context)
+            : _buildPickerState(context),
       ),
     );
   }
@@ -401,24 +412,24 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
             const Gap(32),
             // Hero illustration
             Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.primary.withOpacity(0.08),
-                    AppColors.primary.withOpacity(0.03),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.document_scanner_rounded,
-                size: 80,
-                color: AppColors.primary.withOpacity(0.6),
-              ),
-            )
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.primary.withOpacity(0.08),
+                        AppColors.primary.withOpacity(0.03),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.document_scanner_rounded,
+                    size: 80,
+                    color: AppColors.primary.withOpacity(0.6),
+                  ),
+                )
                 .animate()
                 .fade(duration: 600.ms)
                 .scale(
@@ -455,8 +466,11 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.error_outline_rounded,
-                        color: AppColors.error, size: 20),
+                    const Icon(
+                      Icons.error_outline_rounded,
+                      color: AppColors.error,
+                      size: 20,
+                    ),
                     const Gap(12),
                     Expanded(
                       child: Text(
@@ -499,10 +513,9 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
             const Gap(32),
 
             // Tips
-            _buildTipsCard(context)
-                .animate(delay: 500.ms)
-                .fade()
-                .slideY(begin: 0.3),
+            _buildTipsCard(
+              context,
+            ).animate(delay: 500.ms).fade().slideY(begin: 0.3),
           ],
         ),
       ),
@@ -532,8 +545,8 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
             gradient: gradient,
             color: gradient == null
                 ? (context.isDarkMode
-                    ? context.theme.cardTheme.color
-                    : Colors.white)
+                      ? context.theme.cardTheme.color
+                      : Colors.white)
                 : null,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
@@ -556,9 +569,11 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
                       : AppColors.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(icon,
-                    color: gradient != null ? Colors.white : AppColors.primary,
-                    size: 24),
+                child: Icon(
+                  icon,
+                  color: gradient != null ? Colors.white : AppColors.primary,
+                  size: 24,
+                ),
               ),
               const Gap(16),
               Expanded(
@@ -611,8 +626,11 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
         children: [
           Row(
             children: [
-              Icon(Icons.tips_and_updates_rounded,
-                  color: AppColors.info, size: 20),
+              Icon(
+                Icons.tips_and_updates_rounded,
+                color: AppColors.info,
+                size: 20,
+              ),
               const Gap(8),
               Text(
                 'Mẹo chụp ảnh tốt',
@@ -626,7 +644,11 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
           const Gap(12),
           _buildTipItem(context, '📸', 'Chụp ảnh rõ nét, đủ sáng'),
           _buildTipItem(context, '📐', 'Đặt hóa đơn trên nền phẳng'),
-          _buildTipItem(context, '✂️', 'Chụp toàn bộ hóa đơn, hoặc mã QR rõ ràng'),
+          _buildTipItem(
+            context,
+            '✂️',
+            'Chụp toàn bộ hóa đơn, hoặc mã QR rõ ràng',
+          ),
         ],
       ),
     );
@@ -637,8 +659,10 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         children: [
-          Text(emoji,
-              style: context.textTheme.bodyLarge?.copyWith(fontSize: 14)),
+          Text(
+            emoji,
+            style: context.textTheme.bodyLarge?.copyWith(fontSize: 14),
+          ),
           const Gap(10),
           Expanded(
             child: Text(
@@ -712,17 +736,17 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
               ),
               // Scanning icon
               Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.9),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.document_scanner_rounded,
-                  color: Colors.white,
-                  size: 32,
-                ),
-              )
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.9),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.document_scanner_rounded,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                  )
                   .animate(onPlay: (c) => c.repeat(reverse: true))
                   .scale(
                     begin: const Offset(0.9, 0.9),
@@ -752,8 +776,9 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
                 backgroundColor: AppColors.primary.withOpacity(0.1),
-                valueColor:
-                    const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                  AppColors.primary,
+                ),
               ),
             ),
           ),
@@ -772,18 +797,16 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Image preview + confidence
-            _buildImagePreview(context)
-                .animate()
-                .fade(duration: 500.ms)
-                .slideY(begin: 0.1),
+            _buildImagePreview(
+              context,
+            ).animate().fade(duration: 500.ms).slideY(begin: 0.1),
             const Gap(20),
 
             // Confidence badge
             if (_receiptData != null && _receiptData!.confidence > 0)
-              _buildConfidenceBadge(context)
-                  .animate(delay: 100.ms)
-                  .fade()
-                  .slideX(begin: -0.1),
+              _buildConfidenceBadge(
+                context,
+              ).animate(delay: 100.ms).fade().slideX(begin: -0.1),
             const Gap(24),
 
             // Editable fields
@@ -823,17 +846,15 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
               ),
             ).animate(delay: 350.ms).fade(),
             const Gap(8),
-            _buildCategorySelector(context)
-                .animate(delay: 400.ms)
-                .fade()
-                .slideY(begin: 0.1),
+            _buildCategorySelector(
+              context,
+            ).animate(delay: 400.ms).fade().slideY(begin: 0.1),
             const Gap(14),
 
             // Date
-            _buildDateSelector(context)
-                .animate(delay: 450.ms)
-                .fade()
-                .slideY(begin: 0.1),
+            _buildDateSelector(
+              context,
+            ).animate(delay: 450.ms).fade().slideY(begin: 0.1),
             const Gap(14),
 
             // Note
@@ -848,10 +869,9 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
             // Items breakdown
             if (_receiptData != null && _receiptData!.items.isNotEmpty) ...[
               const Gap(24),
-              _buildItemsBreakdown(context)
-                  .animate(delay: 550.ms)
-                  .fade()
-                  .slideY(begin: 0.1),
+              _buildItemsBreakdown(
+                context,
+              ).animate(delay: 550.ms).fade().slideY(begin: 0.1),
             ],
 
             const Gap(32),
@@ -917,10 +937,7 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withOpacity(0.5),
-                  ],
+                  colors: [Colors.transparent, Colors.black.withOpacity(0.5)],
                 ),
               ),
             ),
@@ -938,8 +955,11 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.check_circle_rounded,
-                      color: Colors.white, size: 16),
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    color: Colors.white,
+                    size: 16,
+                  ),
                   const Gap(6),
                   Text(
                     'Quét thành công',
@@ -962,8 +982,8 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
     final color = _receiptData!.confidence > 0.7
         ? AppColors.success
         : _receiptData!.confidence > 0.4
-            ? AppColors.warning
-            : AppColors.error;
+        ? AppColors.warning
+        : AppColors.error;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -999,7 +1019,9 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: context.isDarkMode ? context.theme.cardTheme.color : Colors.white,
+        color: context.isDarkMode
+            ? context.theme.cardTheme.color
+            : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -1022,8 +1044,10 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
           ),
           filled: true,
           fillColor: Colors.transparent,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
         ),
       ),
     );
@@ -1047,8 +1071,8 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
               color: isSelected
                   ? category.color.withOpacity(0.15)
                   : (context.isDarkMode
-                      ? context.theme.cardTheme.color
-                      : Colors.white),
+                        ? context.theme.cardTheme.color
+                        : Colors.white),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isSelected ? category.color : Colors.transparent,
@@ -1072,8 +1096,7 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
                 Text(
                   category.label,
                   style: context.textTheme.bodySmall?.copyWith(
-                    fontWeight:
-                        isSelected ? FontWeight.bold : FontWeight.w500,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                     color: isSelected
                         ? category.color
                         : context.colorScheme.onSurface.withOpacity(0.6),
@@ -1110,8 +1133,7 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color:
-                  Colors.black.withOpacity(context.isDarkMode ? 0.15 : 0.04),
+              color: Colors.black.withOpacity(context.isDarkMode ? 0.15 : 0.04),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
@@ -1119,8 +1141,11 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
         ),
         child: Row(
           children: [
-            Icon(Icons.calendar_today_rounded,
-                color: AppColors.primary, size: 20),
+            Icon(
+              Icons.calendar_today_rounded,
+              color: AppColors.primary,
+              size: 20,
+            ),
             const Gap(12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1156,7 +1181,9 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: context.isDarkMode ? context.theme.cardTheme.color : Colors.white,
+        color: context.isDarkMode
+            ? context.theme.cardTheme.color
+            : Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -1171,8 +1198,11 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
         children: [
           Row(
             children: [
-              Icon(Icons.format_list_bulleted_rounded,
-                  color: AppColors.primary, size: 20),
+              Icon(
+                Icons.format_list_bulleted_rounded,
+                color: AppColors.primary,
+                size: 20,
+              ),
               const Gap(8),
               Text(
                 'Chi tiết hóa đơn',
@@ -1183,43 +1213,42 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
             ],
           ),
           const Gap(14),
-          ..._receiptData!.items.map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.4),
-                        shape: BoxShape.circle,
-                      ),
+          ..._receiptData!.items.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.4),
+                      shape: BoxShape.circle,
                     ),
-                    const Gap(12),
-                    Expanded(
-                      child: Text(
-                        item.name,
-                        style: context.textTheme.bodySmall,
-                      ),
-                    ),
-                    if (item.quantity > 1) ...[
-                      Text(
-                        'x${item.quantity}',
-                        style: context.textTheme.labelSmall?.copyWith(
-                          color: context.colorScheme.onSurface.withOpacity(0.4),
-                        ),
-                      ),
-                      const Gap(8),
-                    ],
+                  ),
+                  const Gap(12),
+                  Expanded(
+                    child: Text(item.name, style: context.textTheme.bodySmall),
+                  ),
+                  if (item.quantity > 1) ...[
                     Text(
-                      item.amount.toCurrency,
-                      style: context.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
+                      'x${item.quantity}',
+                      style: context.textTheme.labelSmall?.copyWith(
+                        color: context.colorScheme.onSurface.withOpacity(0.4),
                       ),
                     ),
+                    const Gap(8),
                   ],
-                ),
-              )),
+                  Text(
+                    item.amount.toCurrency,
+                    style: context.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           const Divider(),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1259,8 +1288,9 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
         },
         style: OutlinedButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 16),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           side: BorderSide(color: AppColors.primary.withOpacity(0.5)),
         ),
         icon: Icon(icon, size: 18),
@@ -1293,20 +1323,27 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen>
         style: FilledButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 16),
           backgroundColor: Colors.transparent,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
         ),
         icon: _isSaving
             ? const SizedBox(
                 width: 18,
                 height: 18,
                 child: CircularProgressIndicator(
-                    strokeWidth: 2, color: Colors.white),
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
               )
             : Icon(icon, size: 18, color: Colors.white),
-        label: Text(label,
-            style: context.textTheme.labelLarge?.copyWith(
-                color: Colors.white, fontWeight: FontWeight.w600)),
+        label: Text(
+          label,
+          style: context.textTheme.labelLarge?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
     );
   }

@@ -8,6 +8,7 @@ import '../../../data/providers/expense_provider.dart';
 import 'package:gap/gap.dart';
 import 'package:flutter/services.dart';
 import '../../../data/services/local_storage_service.dart';
+import '../../../data/services/smart_alert_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -16,11 +17,13 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProviderStateMixin {
+class _SettingsScreenState extends State<SettingsScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   bool _aiAssistantEnabled = true;
+  bool _smartAlertEnabled = true;
 
   @override
   void initState() {
@@ -29,16 +32,16 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
       duration: const Duration(milliseconds: 600),
       vsync: this,
     );
-    
+
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
     );
-    
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.1),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _animationController, curve: Curves.easeOut));
-    
+
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
+          CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+        );
+
     _animationController.forward();
     _loadAiSetting();
   }
@@ -46,7 +49,10 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   Future<void> _loadAiSetting() async {
     final storage = await LocalStorageService.getInstance();
     if (mounted) {
-      setState(() => _aiAssistantEnabled = storage.isAiAssistantEnabled());
+      setState(() {
+        _aiAssistantEnabled = storage.isAiAssistantEnabled();
+        _smartAlertEnabled = SmartAlertService.instance.isEnabled;
+      });
     }
   }
 
@@ -65,10 +71,8 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           physics: const BouncingScrollPhysics(),
           slivers: [
             // Premium Gradient Header
-            SliverToBoxAdapter(
-              child: _buildGradientHeader(context),
-            ),
-            
+            SliverToBoxAdapter(child: _buildGradientHeader(context)),
+
             // Settings Content
             SliverToBoxAdapter(
               child: FadeTransition(
@@ -87,7 +91,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
-                                color: context.isDarkMode 
+                                color: context.isDarkMode
                                     ? Colors.black.withOpacity(0.3)
                                     : Colors.grey.withOpacity(0.08),
                                 blurRadius: 20,
@@ -104,7 +108,9 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                                     context,
                                     icon: Icons.dark_mode_rounded,
                                     label: 'Chế độ tối',
-                                    subtitle: _getThemeModeLabel(themeProvider.themeMode),
+                                    subtitle: _getThemeModeLabel(
+                                      themeProvider.themeMode,
+                                    ),
                                     iconColor: const Color(0xFF6366F1),
                                     trailing: _buildModernSwitch(
                                       value: themeProvider.isDarkMode,
@@ -113,12 +119,13 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                                       },
                                       activeColor: const Color(0xFF6366F1),
                                     ),
-                                    onTap: () => _showThemeModeSelector(context),
+                                    onTap: () =>
+                                        _showThemeModeSelector(context),
                                   );
                                 },
                               ),
                               _buildDivider(context),
-                              
+
                               _buildSettingsItem(
                                 context,
                                 icon: Icons.savings_rounded,
@@ -130,26 +137,30 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                                   size: 16,
                                   color: Colors.grey,
                                 ),
-                                onTap: () => context.pushNamed(RouteNames.budget),
+                                onTap: () =>
+                                    context.pushNamed(RouteNames.budget),
                               ),
                               _buildDivider(context),
-                              
+
                               _buildSettingsItem(
                                 context,
                                 icon: Icons.notifications_active_rounded,
-                                label: 'Thông báo vượt ngân sách',
-                                subtitle: 'Nhận cảnh báo khi chi quá mức',
+                                label: 'Cảnh báo thông minh',
+                                subtitle: _smartAlertEnabled
+                                    ? 'Cảnh báo khi vượt/gần vượt ngân sách'
+                                    : 'Đã tắt',
                                 iconColor: const Color(0xFFF59E0B),
                                 trailing: _buildModernSwitch(
-                                  value: false,
+                                  value: _smartAlertEnabled,
                                   onChanged: (value) {
-                                    // TODO: Toggle notifications
+                                    SmartAlertService.instance.enabled = value;
+                                    setState(() => _smartAlertEnabled = value);
                                   },
                                   activeColor: const Color(0xFFF59E0B),
                                 ),
                               ),
                               _buildDivider(context),
-                              
+
                               _buildSettingsItem(
                                 context,
                                 icon: Icons.auto_mode_rounded,
@@ -161,10 +172,11 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                                   size: 16,
                                   color: Colors.grey,
                                 ),
-                                onTap: () => context.pushNamed(RouteNames.autoExpense),
+                                onTap: () =>
+                                    context.pushNamed(RouteNames.autoExpense),
                               ),
                               _buildDivider(context),
-                              
+
                               _buildSettingsItem(
                                 context,
                                 icon: Icons.download_rounded,
@@ -183,12 +195,15 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                                 context,
                                 icon: Icons.auto_awesome_rounded,
                                 label: 'Trợ lý AI',
-                                subtitle: _aiAssistantEnabled ? 'Hiển thị trên màn hình chính' : 'Đã ẩn',
+                                subtitle: _aiAssistantEnabled
+                                    ? 'Hiển thị trên màn hình chính'
+                                    : 'Đã ẩn',
                                 iconColor: const Color(0xFF8B5CF6),
                                 trailing: _buildModernSwitch(
                                   value: _aiAssistantEnabled,
                                   onChanged: (value) async {
-                                    final storage = await LocalStorageService.getInstance();
+                                    final storage =
+                                        await LocalStorageService.getInstance();
                                     await storage.setAiAssistantEnabled(value);
                                     setState(() => _aiAssistantEnabled = value);
                                   },
@@ -196,7 +211,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                                 ),
                               ),
                               _buildDivider(context),
-                              
+
                               _buildSettingsItem(
                                 context,
                                 icon: Icons.delete_sweep_rounded,
@@ -207,12 +222,14 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                                 trailing: Icon(
                                   Icons.arrow_forward_ios_rounded,
                                   size: 16,
-                                  color: context.colorScheme.error.withOpacity(0.5),
+                                  color: context.colorScheme.error.withOpacity(
+                                    0.5,
+                                  ),
                                 ),
                                 onTap: _handleDeleteData,
                               ),
                               _buildDivider(context),
-                              
+
                               _buildSettingsItem(
                                 context,
                                 icon: Icons.info_rounded,
@@ -220,34 +237,42 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                                 subtitle: 'Cập nhật mới nhất',
                                 iconColor: const Color(0xFF06B6D4),
                                 trailing: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
                                       colors: [
-                                        const Color(0xFF06B6D4).withOpacity(0.2),
-                                        const Color(0xFF3B82F6).withOpacity(0.2),
+                                        const Color(
+                                          0xFF06B6D4,
+                                        ).withOpacity(0.2),
+                                        const Color(
+                                          0xFF3B82F6,
+                                        ).withOpacity(0.2),
                                       ],
                                     ),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Text(
                                     '1.0.0',
-                                    style: context.textTheme.bodySmall?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: const Color(0xFF06B6D4),
-                                    ),
+                                    style: context.textTheme.bodySmall
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: const Color(0xFF06B6D4),
+                                        ),
                                   ),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        
+
                         const SizedBox(height: 32),
-                        
+
                         // Sign Out Button with premium design
                         _buildSignOutButton(context),
-                        
+
                         const SizedBox(height: 20),
                       ],
                     ),
@@ -268,14 +293,8 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: context.isDarkMode
-              ? [
-                  const Color(0xFF1E293B),
-                  const Color(0xFF0F172A),
-                ]
-              : [
-                  const Color(0xFF6366F1),
-                  const Color(0xFF8B5CF6),
-                ],
+              ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+              : [const Color(0xFF6366F1), const Color(0xFF8B5CF6)],
         ),
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(30),
@@ -323,7 +342,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                 ),
               ),
             ),
-            
+
             SafeArea(
               bottom: false,
               child: Padding(
@@ -423,14 +442,10 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                   ),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(
-                  icon,
-                  size: 22,
-                  color: iconColor,
-                ),
+                child: Icon(icon, size: 22, color: iconColor),
               ),
               const SizedBox(width: 16),
-              
+
               // Label and subtitle
               Expanded(
                 child: Column(
@@ -453,7 +468,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                   ],
                 ),
               ),
-              
+
               const SizedBox(width: 12),
               trailing,
             ],
@@ -550,12 +565,12 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     if (!isPinSet) {
       // Step 1: Set PIN if not set
       final newPin = await _showPinDialog(
-        context, 
-        title: 'Thiết lập mã PIN', 
+        context,
+        title: 'Thiết lập mã PIN',
         subtitle: 'Bảo vệ dữ liệu của bạn',
-        isSetting: true
+        isSetting: true,
       );
-      
+
       if (newPin != null) {
         await pinService.setPin(newPin);
         if (!mounted) return;
@@ -594,14 +609,30 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
       builder: (ctx) => StatefulBuilder(
         builder: (context, setState) {
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
             title: Column(
               children: [
-                Icon(Icons.lock_rounded, size: 48, color: context.colorScheme.primary),
+                Icon(
+                  Icons.lock_rounded,
+                  size: 48,
+                  color: context.colorScheme.primary,
+                ),
                 const Gap(16),
-                Text(title, style: context.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                Text(
+                  title,
+                  style: context.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const Gap(8),
-                Text(subtitle, style: context.textTheme.bodyMedium?.copyWith(color: Colors.grey)),
+                Text(
+                  subtitle,
+                  style: context.textTheme.bodyMedium?.copyWith(
+                    color: Colors.grey,
+                  ),
+                ),
               ],
             ),
             content: Column(
@@ -613,11 +644,17 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                   obscureText: true,
                   maxLength: 4,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 24, letterSpacing: 8, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 24,
+                    letterSpacing: 8,
+                    fontWeight: FontWeight.bold,
+                  ),
                   decoration: InputDecoration(
                     hintText: '----',
                     counterText: '',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   onChanged: (value) {
@@ -631,24 +668,29 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                   const Gap(16),
                   Text(
                     'Hãy ghi nhớ mã PIN này để thực hiện các thao tác bảo mật sau này.',
-                    style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.error),
+                    style: context.textTheme.bodySmall?.copyWith(
+                      color: context.colorScheme.error,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ],
               ],
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Hủy'),
+              ),
               if (isSetting)
                 FilledButton(
                   onPressed: () {
                     if (pin.length == 4) Navigator.pop(ctx, pin);
-                  }, 
-                  child: const Text('Lưu')
+                  },
+                  child: const Text('Lưu'),
                 ),
             ],
           );
-        }
+        },
       ),
     );
   }
@@ -660,7 +702,11 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Row(
           children: [
-            const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            const Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.red,
+              size: 28,
+            ),
             const Gap(12),
             const Text('Cảnh báo cuối cùng'),
           ],
@@ -669,7 +715,10 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           'Toàn bộ dữ liệu chi tiêu, danh mục và cài đặt sẽ bị xóa vĩnh viễn.\n\nHành động này KHÔNG THỂ hoàn tác.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Hủy'),
+          ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
@@ -678,7 +727,11 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
               if (context.mounted) {
                 context.showSnackBar('Đã xóa toàn bộ dữ liệu');
                 // Optional: Restart app or navigate to Intro
-                 Navigator.pushNamedAndRemoveUntil(context, RouteNames.home, (route) => false);
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  RouteNames.home,
+                  (route) => false,
+                );
               }
             },
             child: const Text('Xóa ngay'),
@@ -694,7 +747,7 @@ class _ThemeModeSelectorSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E2C) : Colors.white,
@@ -714,7 +767,7 @@ class _ThemeModeSelectorSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          
+
           // Title
           Text(
             'Chọn giao diện',
@@ -747,7 +800,10 @@ class _ThemeModeSelectorSheet extends StatelessWidget {
                       subtitle: 'Giao diện sáng truyền thống',
                       mode: ThemeMode.light,
                       isSelected: themeProvider.themeMode == ThemeMode.light,
-                      gradientColors: [const Color(0xFFFBBF24), const Color(0xFFF59E0B)],
+                      gradientColors: [
+                        const Color(0xFFFBBF24),
+                        const Color(0xFFF59E0B),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     _buildThemeOption(
@@ -757,7 +813,10 @@ class _ThemeModeSelectorSheet extends StatelessWidget {
                       subtitle: 'Bảo vệ mắt trong bóng tối',
                       mode: ThemeMode.dark,
                       isSelected: themeProvider.themeMode == ThemeMode.dark,
-                      gradientColors: [const Color(0xFF6366F1), const Color(0xFF8B5CF6)],
+                      gradientColors: [
+                        const Color(0xFF6366F1),
+                        const Color(0xFF8B5CF6),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     _buildThemeOption(
@@ -767,14 +826,17 @@ class _ThemeModeSelectorSheet extends StatelessWidget {
                       subtitle: 'Tự động theo cài đặt thiết bị',
                       mode: ThemeMode.system,
                       isSelected: themeProvider.themeMode == ThemeMode.system,
-                      gradientColors: [const Color(0xFF06B6D4), const Color(0xFF3B82F6)],
+                      gradientColors: [
+                        const Color(0xFF06B6D4),
+                        const Color(0xFF3B82F6),
+                      ],
                     ),
                   ],
                 ),
               );
             },
           ),
-          
+
           SizedBox(height: MediaQuery.of(context).padding.bottom + 24),
         ],
       ),
@@ -791,7 +853,7 @@ class _ThemeModeSelectorSheet extends StatelessWidget {
     required List<Color> gradientColors,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -807,7 +869,9 @@ class _ThemeModeSelectorSheet extends StatelessWidget {
           decoration: BoxDecoration(
             color: isSelected
                 ? gradientColors[0].withOpacity(0.1)
-                : (isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.05)),
+                : (isDark
+                      ? Colors.white.withOpacity(0.05)
+                      : Colors.grey.withOpacity(0.05)),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isSelected
@@ -825,18 +889,23 @@ class _ThemeModeSelectorSheet extends StatelessWidget {
                   gradient: LinearGradient(
                     colors: isSelected
                         ? gradientColors
-                        : [Colors.grey.withOpacity(0.3), Colors.grey.withOpacity(0.2)],
+                        : [
+                            Colors.grey.withOpacity(0.3),
+                            Colors.grey.withOpacity(0.2),
+                          ],
                   ),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   icon,
                   size: 22,
-                  color: isSelected ? Colors.white : (isDark ? Colors.white54 : Colors.grey),
+                  color: isSelected
+                      ? Colors.white
+                      : (isDark ? Colors.white54 : Colors.grey),
                 ),
               ),
               const SizedBox(width: 16),
-              
+
               // Text
               Expanded(
                 child: Column(
@@ -846,7 +915,7 @@ class _ThemeModeSelectorSheet extends StatelessWidget {
                       label,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: isSelected 
+                        color: isSelected
                             ? gradientColors[0]
                             : (isDark ? Colors.white : const Color(0xFF1A1A1A)),
                       ),
@@ -855,13 +924,14 @@ class _ThemeModeSelectorSheet extends StatelessWidget {
                     Text(
                       subtitle,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: (isDark ? Colors.white : Colors.black).withOpacity(0.5),
+                        color: (isDark ? Colors.white : Colors.black)
+                            .withOpacity(0.5),
                       ),
                     ),
                   ],
                 ),
               ),
-              
+
               // Checkmark
               if (isSelected)
                 Container(
@@ -883,4 +953,3 @@ class _ThemeModeSelectorSheet extends StatelessWidget {
     );
   }
 }
-

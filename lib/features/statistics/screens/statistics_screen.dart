@@ -7,6 +7,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/extensions/context_extensions.dart';
 import '../../../data/models/expense_model.dart';
 import '../../../data/providers/expense_provider.dart';
+import '../../../data/services/local_storage_service.dart';
 import '../../home/widgets/spending_by_category.dart';
 import '../models/chart_data_point.dart';
 import '../widgets/daily_bar_chart.dart';
@@ -34,6 +35,7 @@ class StatisticsScreen extends StatefulWidget {
 
 class _StatisticsScreenState extends State<StatisticsScreen> {
   StatsPeriod _selectedPeriod = StatsPeriod.month;
+  bool _isAiEnabled = true;
 
   // Current period stats
   double _totalIncome = 0;
@@ -51,7 +53,15 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _recalculateStats();
+      _loadAiSetting();
     });
+  }
+
+  Future<void> _loadAiSetting() async {
+    final storage = await LocalStorageService.getInstance();
+    if (mounted) {
+      setState(() => _isAiEnabled = storage.isAiAssistantEnabled());
+    }
   }
 
   void _recalculateStats() {
@@ -370,8 +380,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
                       const SliverGap(20),
 
-                      // --- Spending Forecast (only for month) ---
-                      if (_selectedPeriod == StatsPeriod.month)
+                      // --- Spending Forecast (only for month and when AI enabled) ---
+                      if (_selectedPeriod == StatsPeriod.month && _isAiEnabled)
                         SliverToBoxAdapter(
                           child:
                               Padding(

@@ -145,6 +145,9 @@ class BudgetProgressCard extends StatelessWidget {
               ],
             ),
 
+            const Gap(16),
+            _buildForecastRow(context),
+
             // Category breakdown (if any)
             if (progress.categoryProgress.isNotEmpty) ...[
               const Gap(16),
@@ -260,6 +263,61 @@ class BudgetProgressCard extends StatelessWidget {
           textAlign: TextAlign.center,
         ),
       ],
+    );
+  }
+
+  Widget _buildForecastRow(BuildContext context) {
+    if (progress.totalSpent <= 0) return const SizedBox.shrink();
+
+    final now = DateTime.now();
+    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+    // Tạm tính dự báo theo trung bình ngày đến hiện tại
+    final double forecast = (progress.totalSpent / now.day) * daysInMonth;
+    final isForecastOver = forecast > progress.budget.totalBudget;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: isForecastOver
+            ? AppColors.error.withOpacity(0.1)
+            : AppColors.info.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isForecastOver
+              ? AppColors.error.withOpacity(0.3)
+              : AppColors.info.withOpacity(0.3),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isForecastOver
+                    ? Icons.warning_amber_rounded
+                    : Icons.auto_graph_rounded,
+                size: 16,
+                color: isForecastOver ? AppColors.error : AppColors.info,
+              ),
+              const Gap(8),
+              Text(
+                'Dự kiến cuối tháng:',
+                style: context.textTheme.labelMedium?.copyWith(
+                  color: isForecastOver ? AppColors.error : AppColors.info,
+                ),
+              ),
+            ],
+          ),
+          Text(
+            forecast.toCurrency,
+            style: context.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: isForecastOver ? AppColors.error : AppColors.info,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

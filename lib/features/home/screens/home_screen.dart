@@ -13,10 +13,13 @@ import '../../../data/services/auto_expense_service.dart';
 import '../../../data/services/local_storage_service.dart';
 import '../../../data/services/budget_service.dart';
 import '../../../data/services/mock_data_service.dart';
+import '../../../data/services/smart_alert_service.dart';
 import '../../budget/widgets/budget_progress_card.dart';
 import '../widgets/ai_assistant_popup.dart';
+import '../widgets/ai_insight_card.dart';
 import '../widgets/balance_card.dart';
 import '../widgets/draggable_ai_fab.dart';
+import '../widgets/goal_progress_card.dart';
 import '../widgets/notification_bottom_sheet.dart';
 import '../widgets/quick_shortcuts.dart';
 import '../widgets/recent_transactions_list.dart';
@@ -30,7 +33,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _currentNavIndex = 0;
-  bool _showAiFab = true;
+  bool _isAiEnabled = true;
   bool _hasUrgentAlert = false;
 
   @override
@@ -52,12 +55,63 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           provider.currentMonthExpenses,
           provider.budgetProgress,
         );
+        // Show smart alert if trigger detected
+        if (urgentAlert && mounted) {
+          _showSmartAlertIfNeeded(provider);
+        }
       } catch (_) {}
 
       setState(() {
-        _showAiFab = storage.isAiAssistantEnabled();
+        _isAiEnabled = storage.isAiAssistantEnabled();
         _hasUrgentAlert = urgentAlert;
       });
+    }
+  }
+
+  /// Show smart in-app alert based on budget status
+  void _showSmartAlertIfNeeded(ExpenseProvider provider) {
+    final bp = provider.budgetProgress;
+    if (bp == null || !bp.budget.isSet) return;
+
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    final startOfWeekDate = DateTime(
+      startOfWeek.year,
+      startOfWeek.month,
+      startOfWeek.day,
+    );
+
+    final thisWeekTotal = provider.currentMonthExpenses
+        .where(
+          (e) =>
+              e.type == TransactionType.expense &&
+              e.date.isAfter(
+                startOfWeekDate.subtract(const Duration(seconds: 1)),
+              ),
+        )
+        .fold<double>(0, (s, e) => s + e.amount);
+
+    final weeklyBudget = bp.budget.totalBudget / 4;
+    if (weeklyBudget <= 0) return;
+
+    final percentUsed = (thisWeekTotal / weeklyBudget * 100).round();
+    final daysRemaining = 7 - now.weekday;
+
+    if (thisWeekTotal > weeklyBudget) {
+      // Over budget
+      SmartAlertService.showOverBudgetAlert(
+        context,
+        category: '',
+        spent: thisWeekTotal,
+        budget: weeklyBudget,
+      );
+    } else if (percentUsed > 80 && daysRemaining > 2) {
+      // Near budget
+      SmartAlertService.showNearBudgetAlert(
+        context,
+        percentUsed: percentUsed,
+        daysRemaining: daysRemaining,
+      );
     }
   }
 
@@ -68,6 +122,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       expenses: provider.currentMonthExpenses,
       totalBalance: provider.totalBalance,
       budgetProgress: provider.budgetProgress,
+      goal: provider.goal,
+      suggestions: provider.suggestions,
       onViewStatistics: () {
         Navigator.of(context).pushNamed(RouteNames.statistics);
       },
@@ -140,7 +196,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       SliverToBoxAdapter(
                         child: provider.isLoading
                             ? _buildLoadingState(context)
-                            : _buildContent(context, provider),
+                            : _buildContent(context, provider, _isAiEnabled),
                       ),
                     ],
                   ),
@@ -150,7 +206,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
 
             // Draggable AI Assistant FAB — topmost layer
-            if (_showAiFab)
+            if (_isAiEnabled)
               DraggableAiFab(
                 onTap: _showAiAssistantPopup,
                 showAlertDot: _hasUrgentAlert,
@@ -435,7 +491,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildContent(BuildContext context, ExpenseProvider provider) {
+  Widget _buildContent(
+    BuildContext context,
+    ExpenseProvider provider,
+    bool isAiEnabled,
+  ) {
     final expenses = provider.currentMonthExpenses;
     final budgetProgress = provider.budgetProgress;
 
@@ -463,7 +523,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
           const Gap(28),
 
-          // Budget Progress Card
           if (budgetProgress != null)
             BudgetProgressCard(
                   progress: budgetProgress,
@@ -474,9 +533,30 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 .slideY(begin: 0.1, end: 0, curve: Curves.easeOutCubic),
           const Gap(28),
 
+          // Goal Progress Card
+          const GoalProgressCard()
+              .animate()
+              .fade(duration: 500.ms, delay: 250.ms)
+              .slideY(begin: 0.1, end: 0, curve: Curves.easeOutCubic),
+          const Gap(28),
+
+          // AI Insight Card — chỉ hiển thị khi AI được bật
+          if (isAiEnabled && provider.suggestions.isNotEmpty) ...[
+            AiInsightCard(
+                  suggestions: provider.suggestions,
+                  onDismiss: (id) => provider.dismissSuggestion(id),
+                  onOpenChat: _showAiAssistantPopup,
+                )
+                .animate()
+                .fade(duration: 500.ms, delay: 300.ms)
+                .slideY(begin: 0.1, end: 0, curve: Curves.easeOutCubic),
+            const Gap(28),
+          ],
+
           // Quick Shortcuts
           QuickShortcuts(
             onActionCompleted: () => context.read<ExpenseProvider>().refresh(),
+            isAiEnabled: isAiEnabled,
           ),
           const Gap(28),
 
@@ -610,7 +690,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           context.read<ExpenseProvider>().refresh();
           final storage = await LocalStorageService.getInstance();
           if (mounted) {
-            setState(() => _showAiFab = storage.isAiAssistantEnabled());
+            setState(() => _isAiEnabled = storage.isAiAssistantEnabled());
           }
         }
       },

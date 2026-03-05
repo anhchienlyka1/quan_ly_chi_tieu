@@ -11,8 +11,13 @@ import '../../../data/models/expense_model.dart';
 /// Displays 4 key actions in a single horizontal row to save vertical space.
 class QuickShortcuts extends StatelessWidget {
   final VoidCallback? onActionCompleted;
+  final bool isAiEnabled;
 
-  const QuickShortcuts({super.key, this.onActionCompleted});
+  const QuickShortcuts({
+    super.key,
+    this.onActionCompleted,
+    this.isAiEnabled = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -66,20 +71,22 @@ class QuickShortcuts extends StatelessWidget {
                 },
               ),
             ),
-            const Gap(8),
-            Expanded(
-              child: _ShortcutItem(
-                icon: Icons.qr_code_scanner_rounded,
-                label: 'Quét hoá đơn',
-                iconColor: AppColors.info,
-                delay: 300.ms,
-                onTap: () async {
-                  HapticFeedback.lightImpact();
-                  await context.pushNamed(RouteNames.scanReceipt);
-                  onActionCompleted?.call();
-                },
+            if (isAiEnabled) ...[
+              const Gap(8),
+              Expanded(
+                child: _ShortcutItem(
+                  icon: Icons.qr_code_scanner_rounded,
+                  label: 'Quét hoá đơn',
+                  iconColor: AppColors.info,
+                  delay: 300.ms,
+                  onTap: () async {
+                    HapticFeedback.lightImpact();
+                    await context.pushNamed(RouteNames.scanReceipt);
+                    onActionCompleted?.call();
+                  },
+                ),
               ),
-            ),
+            ],
             const Gap(8),
             Expanded(
               child: _ShortcutItem(
@@ -133,57 +140,58 @@ class _ShortcutItemState extends State<_ShortcutItem>
         widget.onTap();
       },
       onTapCancel: () => setState(() => _isPressed = false),
-      child: AnimatedScale(
-        scale: _isPressed ? 0.9 : 1.0,
-        duration: const Duration(milliseconds: 100),
-        curve: Curves.easeOutCubic,
-        child: Container(
-          color: Colors.transparent, // Hit test target
-          alignment: Alignment.center,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Icon Container
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: widget.iconColor.withOpacity(
-                    context.isDarkMode ? 0.15 : 0.08,
+      child:
+          AnimatedScale(
+                scale: _isPressed ? 0.9 : 1.0,
+                duration: const Duration(milliseconds: 100),
+                curve: Curves.easeOutCubic,
+                child: Container(
+                  color: Colors.transparent, // Hit test target
+                  alignment: Alignment.center,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Icon Container
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: widget.iconColor.withOpacity(
+                            context.isDarkMode ? 0.15 : 0.08,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: widget.iconColor.withOpacity(
+                              context.isDarkMode ? 0.1 : 0.05,
+                            ),
+                            width: 1,
+                          ),
+                        ),
+                        child: Icon(
+                          widget.icon,
+                          color: widget.iconColor,
+                          size: 26,
+                        ),
+                      ),
+                      const Gap(8),
+                      // Label
+                      Text(
+                        widget.label,
+                        style: context.textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: context.colorScheme.onSurface.withOpacity(0.8),
+                          fontSize: 11,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: widget.iconColor.withOpacity(
-                      context.isDarkMode ? 0.1 : 0.05,
-                    ),
-                    width: 1,
-                  ),
                 ),
-                child: Icon(
-                  widget.icon,
-                  color: widget.iconColor,
-                  size: 26,
-                ),
-              ),
-              const Gap(8),
-              // Label
-              Text(
-                widget.label,
-                style: context.textTheme.labelSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: context.colorScheme.onSurface.withOpacity(0.8),
-                  fontSize: 11,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-      )
-          .animate(delay: widget.delay)
-          .fade(duration: 400.ms)
-          .slideY(begin: 0.2, end: 0, curve: Curves.easeOutCubic),
+              )
+              .animate(delay: widget.delay)
+              .fade(duration: 400.ms)
+              .slideY(begin: 0.2, end: 0, curve: Curves.easeOutCubic),
     );
   }
 }

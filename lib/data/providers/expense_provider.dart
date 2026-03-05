@@ -2,6 +2,10 @@ import 'package:flutter/foundation.dart';
 import '../models/expense_model.dart';
 import '../repositories/expense_repository.dart';
 import '../services/budget_service.dart';
+import '../models/goal_model.dart';
+import '../models/smart_suggestion_model.dart';
+import '../services/local_storage_service.dart';
+import '../services/smart_suggestion_service.dart';
 
 /// Centralized state for all expense/income data.
 /// This is the **single source of truth** — every screen should read from here.
@@ -12,10 +16,14 @@ import '../services/budget_service.dart';
 class ExpenseProvider extends ChangeNotifier {
   final ExpenseRepository _repository = ExpenseRepository();
   final BudgetService _budgetService = BudgetService();
+  final LocalStorageService _localStorageService =
+      LocalStorageService(); // Added LocalStorageService
 
   // ───────── State ─────────
   List<ExpenseModel> _expenses = [];
   BudgetProgress? _budgetProgress;
+  FinancialGoal? _goal;
+  List<SmartSuggestion> _suggestions = [];
   bool _isLoading = false;
   String? _error;
 
@@ -24,6 +32,8 @@ class ExpenseProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   BudgetProgress? get budgetProgress => _budgetProgress;
+  FinancialGoal? get goal => _goal;
+  List<SmartSuggestion> get suggestions => List.unmodifiable(_suggestions);
 
   /// Current-month expenses (sorted newest first)
   List<ExpenseModel> get currentMonthExpenses {
@@ -64,9 +74,17 @@ class ExpenseProvider extends ChangeNotifier {
 
       _expenses = all;
 
+      // Get goal from LocalStorageService
+      _goal = _localStorageService.getGoal();
+
       // Recalculate budget progress
-      _budgetProgress = await _budgetService.calculateProgress(
+      _budgetProgress = await _budgetService.calculateProgress(expenses: all);
+
+      // Generate smart suggestions
+      final budget = _localStorageService.getMonthlyBudget();
+      _suggestions = SmartSuggestionService.analyzePatternsAndSuggest(
         expenses: all,
+        monthlyBudget: budget,
       );
 
       _isLoading = false;
@@ -102,6 +120,37 @@ class ExpenseProvider extends ChangeNotifier {
     await _repository.deleteAllData();
     _expenses = [];
     _budgetProgress = null;
+    _goal = null;
+    _suggestions = [];
+    notifyListeners();
+  }
+
+  /// Dismiss a smart suggestion by ID
+  void dismissSuggestion(String id) {
+    _suggestions = _suggestions.where((s) => s.id != id).toList();
+    notifyListeners();
+  }
+
+  // --- GOAL ACTIONS ---
+
+  Future<void> setGoal(FinancialGoal goal) async {
+    _goal = goal;
+    await _localStorageService.saveGoal(goal);
+    notifyListeners();
+  }
+
+  Future<void> addSavingsToGoal(double amount) async {
+    if (_goal == null) return;
+
+    final updatedGoal = FinancialGoal(
+      title: _goal!.title,
+      targetAmount: _goal!.targetAmount,
+      savedAmount: _goal!.savedAmount + amount,
+      deadline: _goal!.deadline,
+    );
+
+    _goal = updatedGoal;
+    await _localStorageService.saveGoal(updatedGoal);
     notifyListeners();
   }
 
