@@ -125,6 +125,14 @@ class ExpenseProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Import multiple expenses from an external source (e.g. Excel file).
+  Future<void> importExpenses(List<ExpenseModel> expenses) async {
+    for (final expense in expenses) {
+      await _repository.addExpense(expense);
+    }
+    await loadExpenses();
+  }
+
   /// Dismiss a smart suggestion by ID
   void dismissSuggestion(String id) {
     _suggestions = _suggestions.where((s) => s.id != id).toList();

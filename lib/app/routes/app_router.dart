@@ -8,6 +8,7 @@ import '../../features/settings/screens/settings_screen.dart';
 import '../../features/scan_receipt/screens/scan_receipt_screen.dart';
 import '../../features/budget/screens/budget_screen.dart';
 import '../../features/settings/screens/auto_expense_screen.dart';
+import '../../features/settings/screens/export_data_screen.dart';
 import '../../features/home/screens/ai_chat_history_screen.dart';
 import '../../data/models/expense_model.dart';
 
@@ -60,6 +61,9 @@ class AppRouter {
 
       case RouteNames.autoExpense:
         return _buildRoute(const AutoExpenseScreen(), settings);
+
+      case RouteNames.exportData:
+        return _buildRoute(const ExportDataScreen(), settings);
 
       default:
         return _buildRoute(

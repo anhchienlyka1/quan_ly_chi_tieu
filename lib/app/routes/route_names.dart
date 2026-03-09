@@ -14,4 +14,5 @@ class RouteNames {
   static const String autoExpense = '/auto-expense';
   static const String categoryManagement = '/category_management';
   static const String aiHistory = '/ai_history';
+  static const String exportData = '/export-data';
 }

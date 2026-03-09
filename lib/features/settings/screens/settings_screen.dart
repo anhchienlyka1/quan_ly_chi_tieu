@@ -180,14 +180,16 @@ class _SettingsScreenState extends State<SettingsScreen>
                               _buildSettingsItem(
                                 context,
                                 icon: Icons.download_rounded,
-                                label: 'Xuất dữ liệu',
-                                subtitle: 'Excel, CSV, PDF',
+                                label: 'Nhập & Xuất dữ liệu',
+                                subtitle: 'Nhập & Xuất file Excel',
                                 iconColor: const Color(0xFF14B8A6),
                                 trailing: const Icon(
                                   Icons.arrow_forward_ios_rounded,
                                   size: 16,
                                   color: Colors.grey,
                                 ),
+                                onTap: () =>
+                                    context.pushNamed(RouteNames.exportData),
                               ),
                               _buildDivider(context),
 

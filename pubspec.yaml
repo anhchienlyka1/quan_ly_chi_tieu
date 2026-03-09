@@ -52,6 +52,12 @@ dependencies:
   pdf: ^3.11.3
   share_plus: ^12.0.1
   path_provider: ^2.1.5
+  excel: ^4.0.6
+  file_picker: ^8.0.0+1
+
+dependency_overrides:
+  flutter_notification_listener:
+    path: packages/flutter_notification_listener
 
 dev_dependencies:
   flutter_test:
@@ -64,6 +70,21 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   shared_preferences_platform_interface: ^2.4.1
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#6C63FF"
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
+  web:
+    generate: false
+  windows:
+    generate: false
+  macos:
+    generate: false
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -78,6 +99,7 @@ flutter:
 
   assets:
     - .env
+    - assets/icon/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

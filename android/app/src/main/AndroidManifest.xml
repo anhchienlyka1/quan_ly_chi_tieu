@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="quan_ly_chi_tieu"
+        android:label="Trợ lý Fin"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -32,17 +32,13 @@
             android:name="flutterEmbedding"
             android:value="2" />
         
-        <!-- Disable Impeller to fix rendering issues -->
-        <meta-data
-            android:name="io.flutter.embedding.android.EnableImpeller"
-            android:value="false" />
-
         <!-- Notification Listener Service for auto-expense recording -->
         <service
             android:name="im.zoe.labs.flutter_notification_listener.NotificationsHandlerService"
             android:label="flutter_notification_listener"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
-            android:exported="true">
+            android:exported="true"
+            android:foregroundServiceType="specialUse">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>

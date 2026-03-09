@@ -49,20 +49,17 @@ subprojects {
                 val targetJavaVersion = if (useLegacyJava) org.gradle.api.JavaVersion.VERSION_1_8 else org.gradle.api.JavaVersion.VERSION_17
 
                 if (project.name != "app") {
-                    // Only force compileSdk 34 for modern plugins (Java 17 require compileSdk 30+)
-                    // Legacy plugins keep their default compileSdk (safe with Java 1.8)
-                    if (!useLegacyJava) {
+                    // Force compileSdk 34 for all plugins (required for lStar attribute in Material 1.5+)
+                    try {
+                        val setCompileSdkVersion = android.javaClass.getMethod("setCompileSdkVersion", Int::class.javaPrimitiveType)
+                        setCompileSdkVersion.invoke(android, 34)
+                        println("Forced compileSdkVersion to 34 for ${project.name}")
+                    } catch(e: Exception) {
                         try {
-                            val setCompileSdkVersion = android.javaClass.getMethod("setCompileSdkVersion", Int::class.javaPrimitiveType)
-                            setCompileSdkVersion.invoke(android, 34)
-                            println("Forced compileSdkVersion to 34 for ${project.name}")
-                        } catch(e: Exception) {
-                            try {
-                                 val setCompileSdkVersion = android.javaClass.getMethod("setCompileSdkVersion", Int::class.java)
-                                 setCompileSdkVersion.invoke(android, 34)
-                            } catch(e2: Exception) {
-                                println("Could not force compileSdkVersion for ${project.name}: ${e.message}")
-                            }
+                             val setCompileSdkVersion = android.javaClass.getMethod("setCompileSdkVersion", Int::class.java)
+                             setCompileSdkVersion.invoke(android, 34)
+                        } catch(e2: Exception) {
+                            println("Could not force compileSdkVersion for ${project.name}: ${e.message}")
                         }
                     }
 
