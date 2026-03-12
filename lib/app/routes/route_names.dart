@@ -15,4 +15,9 @@ class RouteNames {
   static const String categoryManagement = '/category_management';
   static const String aiHistory = '/ai_history';
   static const String exportData = '/export-data';
+
+  // Gold Feature
+  static const String goldDashboard = '/gold-dashboard';
+  static const String goldAdd = '/gold-add';
+  static const String goldDetail = '/gold-detail';
 }

@@ -10,7 +10,11 @@ import '../../features/budget/screens/budget_screen.dart';
 import '../../features/settings/screens/auto_expense_screen.dart';
 import '../../features/settings/screens/export_data_screen.dart';
 import '../../features/home/screens/ai_chat_history_screen.dart';
+import '../../features/gold/screens/gold_dashboard_screen.dart';
+import '../../features/gold/screens/add_gold_screen.dart';
+import '../../features/gold/screens/gold_detail_screen.dart';
 import '../../data/models/expense_model.dart';
+import '../../data/models/gold_asset_model.dart';
 
 /// Centralized route management using onGenerateRoute.
 /// All navigation logic should be handled here.
@@ -64,6 +68,22 @@ class AppRouter {
 
       case RouteNames.exportData:
         return _buildRoute(const ExportDataScreen(), settings);
+
+      // ── Gold Feature Routes ─────────────────────────────────
+      case RouteNames.goldDashboard:
+        return _buildRoute(const GoldDashboardScreen(), settings);
+
+      case RouteNames.goldAdd:
+        final arg = settings.arguments;
+        final existingAsset = arg is GoldAssetModel ? arg : null;
+        return _buildRoute(
+          AddGoldScreen(existingAsset: existingAsset),
+          settings,
+        );
+
+      case RouteNames.goldDetail:
+        final asset = settings.arguments as GoldAssetModel;
+        return _buildRoute(GoldDetailScreen(asset: asset), settings);
 
       default:
         return _buildRoute(

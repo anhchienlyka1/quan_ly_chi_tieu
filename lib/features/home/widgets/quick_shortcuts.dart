@@ -90,6 +90,20 @@ class QuickShortcuts extends StatelessWidget {
             const Gap(8),
             Expanded(
               child: _ShortcutItem(
+                icon: Icons.savings_rounded,
+                label: 'Vàng',
+                iconColor: AppColors.goldPrimary,
+                delay: 350.ms,
+                onTap: () async {
+                  HapticFeedback.lightImpact();
+                  await context.pushNamed(RouteNames.goldDashboard);
+                  onActionCompleted?.call();
+                },
+              ),
+            ),
+            const Gap(8),
+            Expanded(
+              child: _ShortcutItem(
                 icon: Icons.pie_chart_rounded,
                 label: 'Thống kê',
                 iconColor: AppColors.primary,

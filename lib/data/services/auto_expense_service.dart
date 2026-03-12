@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:isolate';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
@@ -20,7 +21,9 @@ import 'transaction_categorizer_service.dart';
 void onNotificationReceived(NotificationEvent event) async {
   // 1. Forward to UI Isolate if running
   try {
-    final SendPort? send = IsolateNameServer.lookupPortByName(NotificationsListener.SEND_PORT_NAME);
+    final SendPort? send = IsolateNameServer.lookupPortByName(
+      NotificationsListener.SEND_PORT_NAME,
+    );
     send?.send(event);
   } catch (e) {
     debugPrint('⚠️ Error sending to UI isolate: $e');
@@ -29,14 +32,14 @@ void onNotificationReceived(NotificationEvent event) async {
   // 2. Filter nhanh
   final packageName = event.packageName ?? '';
   if (!BankNotificationParser.isBankNotification(packageName)) return;
-  
+
   // Plugin flutter_notification_listener thường gửi event khi có noti.
 
   try {
     // 2. Init SharedPreferences
     WidgetsFlutterBinding.ensureInitialized();
     final prefs = await SharedPreferences.getInstance();
-    
+
     // 3. Parse Notification
     final parsed = BankNotificationParser.parseNotification(
       packageName: packageName,
@@ -52,7 +55,10 @@ void onNotificationReceived(NotificationEvent event) async {
     try {
       final List<dynamic> jsonList = jsonDecode(historyJson);
       pendingNotifications = jsonList
-          .map((json) => BankNotificationModel.fromMap(json as Map<String, dynamic>))
+          .map(
+            (json) =>
+                BankNotificationModel.fromMap(json as Map<String, dynamic>),
+          )
           .toList();
     } catch (_) {
       pendingNotifications = [];
@@ -62,8 +68,8 @@ void onNotificationReceived(NotificationEvent event) async {
     final isDuplicate = pendingNotifications.any((n) {
       final timeDiff = n.timestamp.difference(parsed.timestamp).inSeconds.abs();
       return n.amount == parsed.amount &&
-             n.isIncoming == parsed.isIncoming &&
-             timeDiff < 60;
+          n.isIncoming == parsed.isIncoming &&
+          timeDiff < 60;
     });
 
     if (isDuplicate) return;
@@ -72,34 +78,38 @@ void onNotificationReceived(NotificationEvent event) async {
     // Lưu ý: TransactionCategorizerService cần API Key, ở background có thể không lấy được từ user preferences an toàn hoặc phức tạp.
     // Tạm thời lưu raw, khi mở app User sẽ thấy transaction.
     // Hoặc nếu muốn tốt hơn: instance TransactionCategorizerService ở đây nếu có thể.
-    
+
     // Fallback category logic đơn giản cho background (keyword)
     // Vì TransactionCategorizerService có logic fallback keyword, ta có thể dùng nó.
     // Tuy nhiên TransactionCategorizerService setup hơi phức tạp với Singleton.
     // Ta copy logic basic hoặc chấp nhận category 'other' lúc đầu.
-    
+
     // 5b. Internal Transfer Check (Link & Merge)
     int matchIndex = -1;
     for (int i = 0; i < pendingNotifications.length; i++) {
-        final item = pendingNotifications[i];
-        
-        // Time diff < 120s
-        if (item.timestamp.difference(parsed.timestamp).inSeconds.abs() > 120) continue;
-        
-        // Check criteria: Same amount, Opposite direction, Unlinked
-        if (item.amount == parsed.amount && 
-            item.isIncoming != parsed.isIncoming && 
-            item.linkedTransactionId == null) {
-          matchIndex = i;
-          break;
-        }
+      final item = pendingNotifications[i];
+
+      // Time diff < 120s
+      if (item.timestamp.difference(parsed.timestamp).inSeconds.abs() > 120) {
+        continue;
+      }
+
+      // Check criteria: Same amount, Opposite direction, Unlinked
+      if (item.amount == parsed.amount &&
+          item.isIncoming != parsed.isIncoming &&
+          item.linkedTransactionId == null) {
+        matchIndex = i;
+        break;
+      }
     }
 
     if (matchIndex != -1) {
       // Merge found!
       final existing = pendingNotifications[matchIndex];
-      debugPrint('🔗 [Background] Internal transfer detected: $packageName <-> ${existing.packageName}');
-      
+      debugPrint(
+        '🔗 [Background] Internal transfer detected: $packageName <-> ${existing.packageName}',
+      );
+
       final merged = existing.copyWith(
         linkedTransactionId: parsed.id,
         parsedTitle: 'Chuyển tiền nội bộ',
@@ -110,13 +120,13 @@ void onNotificationReceived(NotificationEvent event) async {
     } else {
       // No match -> Standard Insert
       pendingNotifications.insert(
-        0, 
+        0,
         parsed.copyWith(
-          parsedTitle: parsed.isIncoming ? 'Nhận tiền' : 'Chuyển tiền'
-        )
+          parsedTitle: parsed.isIncoming ? 'Nhận tiền' : 'Chuyển tiền',
+        ),
       );
     }
-    
+
     // Limit 50
     if (pendingNotifications.length > 50) {
       pendingNotifications = pendingNotifications.sublist(0, 50);
@@ -125,9 +135,8 @@ void onNotificationReceived(NotificationEvent event) async {
     // 7. Save back
     final newJsonList = pendingNotifications.map((n) => n.toMap()).toList();
     await prefs.setString('auto_expense_history', jsonEncode(newJsonList));
-    
-    debugPrint('💾 [Background] Saved transaction: ${parsed.amount}');
 
+    debugPrint('💾 [Background] Saved transaction: ${parsed.amount}');
   } catch (e) {
     debugPrint('❌ [Background] Error: $e');
   }
@@ -137,19 +146,21 @@ void onNotificationReceived(NotificationEvent event) async {
 /// Hỗ trợ chạy ngầm trên Android nhờ `flutter_notification_listener`.
 class AutoExpenseService with WidgetsBindingObserver {
   static AutoExpenseService? _instance;
-  
+
   final ExpenseRepository _expenseRepository = ExpenseRepository();
   LocalStorageService? _storage;
   TransactionCategorizerService? _categorizer;
   StreamSubscription? _notificationSubscription;
-  
+
   List<BankNotificationModel> _pendingNotifications = [];
   bool _isListening = false;
 
   // Stream controller to broadcast new notifications to UI
-  final _notificationStreamController = StreamController<BankNotificationModel>.broadcast();
-  Stream<BankNotificationModel> get notificationStream => _notificationStreamController.stream;
-  
+  final _notificationStreamController =
+      StreamController<BankNotificationModel>.broadcast();
+  Stream<BankNotificationModel> get notificationStream =>
+      _notificationStreamController.stream;
+
   AutoExpenseService._();
 
   static Future<AutoExpenseService> getInstance() async {
@@ -168,13 +179,13 @@ class AutoExpenseService with WidgetsBindingObserver {
     _storage = await LocalStorageService.getInstance();
     _categorizer = await TransactionCategorizerService.getInstance();
     _loadHistory();
-    
+
     // Remove any legacy mock data that might be persisted
     _pendingNotifications.removeWhere((n) => n.id.startsWith('mock_'));
     _saveHistory();
 
     // Auto-start if enabled (only on Android)
-    if (!kIsWeb && _storage?.isAutoExpenseEnabled() == true) {
+    if (isSupported && _storage?.isAutoExpenseEnabled() == true) {
       await startListening();
     }
   }
@@ -186,16 +197,16 @@ class AutoExpenseService with WidgetsBindingObserver {
       debugPrint('🔄 App resumed, reloading notifications from storage...');
       _loadHistory();
       // Notify listeners (UI) that list might have changed
-       _notificationStreamController.add(
+      _notificationStreamController.add(
         BankNotificationModel(
-          id: 's', 
-          bankName: '', 
-          packageName: '', 
-          amount: 0, 
-          isIncoming: false, 
-          rawContent: '', 
-          timestamp: DateTime.now()
-        )
+          id: 's',
+          bankName: '',
+          packageName: '',
+          amount: 0,
+          isIncoming: false,
+          rawContent: '',
+          timestamp: DateTime.now(),
+        ),
       ); // Dummy event to trigger stream? Or better: UI should invoke refresh
       // Actually, standard StreamBuilder might not update list if list reference changed?
       // Better ensure the getter returns the new list.
@@ -205,15 +216,16 @@ class AutoExpenseService with WidgetsBindingObserver {
   bool get isListening => _isListening;
   bool get isEnabled => _storage?.isAutoExpenseEnabled() ?? false;
   bool get isAIConfigured => _categorizer?.isConfigured ?? false;
-  bool get isSupported => !kIsWeb; // Only Android supported
+  bool get isSupported => !kIsWeb && Platform.isAndroid; // Android-only plugin
   List<BankNotificationModel> get pendingNotifications => List.unmodifiable(
     _pendingNotifications.where((n) => !n.isAutoRecorded).toList(),
   );
-  List<BankNotificationModel> get allNotifications => List.unmodifiable(_pendingNotifications);
+  List<BankNotificationModel> get allNotifications =>
+      List.unmodifiable(_pendingNotifications);
 
   /// Kiểm tra quyền notification access
   Future<bool> hasPermission() async {
-    if (kIsWeb) return false;
+    if (!isSupported) return false;
     try {
       final bool? isGranted = await NotificationsListener.hasPermission;
       return isGranted ?? false;
@@ -224,7 +236,7 @@ class AutoExpenseService with WidgetsBindingObserver {
 
   /// Yêu cầu cấp quyền notification access
   Future<void> requestPermission() async {
-    if (kIsWeb) return;
+    if (!isSupported) return;
     try {
       await NotificationsListener.openPermissionSettings();
     } catch (e) {
@@ -235,10 +247,10 @@ class AutoExpenseService with WidgetsBindingObserver {
   /// Bật tính năng và bắt đầu lắng nghe
   Future<bool> enable() async {
     if (kIsWeb) return false;
-    
+
     // Open settings to let user enable
     await requestPermission();
-    
+
     await _storage?.setAutoExpenseEnabled(true);
     await startListening();
     return true;
@@ -252,20 +264,24 @@ class AutoExpenseService with WidgetsBindingObserver {
 
   /// Bắt đầu lắng nghe notification
   Future<void> startListening() async {
-    if (_isListening || kIsWeb) return;
+    if (_isListening || !isSupported) return;
 
     try {
       // Register background callback
-      await NotificationsListener.initialize(callbackHandle: onNotificationReceived);
-      
+      await NotificationsListener.initialize(
+        callbackHandle: onNotificationReceived,
+      );
+
       // Listen to ReceivePort for foreground updates
       // Note: receivePort might require re-registration if isolate changed, but plugin handles it.
-      _notificationSubscription = NotificationsListener.receivePort?.listen((event) {
-          if (event is NotificationEvent) {
-             _onForegroundNotificationInternal(event);
-          }
+      _notificationSubscription = NotificationsListener.receivePort?.listen((
+        event,
+      ) {
+        if (event is NotificationEvent) {
+          _onForegroundNotificationInternal(event);
+        }
       });
-      
+
       // Start service (HEADLESS support)
       await NotificationsListener.startService(
         title: "Quản lý chi tiêu",
@@ -273,7 +289,9 @@ class AutoExpenseService with WidgetsBindingObserver {
       );
 
       _isListening = true;
-      debugPrint('✅ Auto-expense listener started (flutter_notification_listener)');
+      debugPrint(
+        '✅ Auto-expense listener started (flutter_notification_listener)',
+      );
     } catch (e) {
       debugPrint('❌ Failed to start notification listener: $e');
       _isListening = false;
@@ -284,29 +302,36 @@ class AutoExpenseService with WidgetsBindingObserver {
   Future<void> stopListening() async {
     _notificationSubscription?.cancel();
     _notificationSubscription = null;
-    await NotificationsListener.stopService();
+    if (isSupported) await NotificationsListener.stopService();
     _isListening = false;
     debugPrint('🛑 Auto-expense listener stopped');
   }
 
   /// Xử lý notification nhận được qua Port (Foreground/Background active)
-  Future<void> _onForegroundNotificationInternal(NotificationEvent event) async {
+  Future<void> _onForegroundNotificationInternal(
+    NotificationEvent event,
+  ) async {
     // Background callback (isolate) đã xử lý việc lưu vào SharedPreferences.
     // Ở đây ta chỉ cần reload dữ liệu để UI cập nhật.
-    
+
     final String packageName = event.packageName ?? '';
     if (!BankNotificationParser.isBankNotification(packageName)) return;
-    
+
     debugPrint('🏦 [Foreground] Bank notification event received');
     _loadHistory();
-    
+
     // Notify UI to refresh
-     _notificationStreamController.add(
-        BankNotificationModel(
-          id: 'refresh_${DateTime.now().millisecondsSinceEpoch}', 
-          bankName: '', packageName: '', amount: 0, isIncoming: false, rawContent: '', timestamp: DateTime.now()
-        )
-      );
+    _notificationStreamController.add(
+      BankNotificationModel(
+        id: 'refresh_${DateTime.now().millisecondsSinceEpoch}',
+        bankName: '',
+        packageName: '',
+        amount: 0,
+        isIncoming: false,
+        rawContent: '',
+        timestamp: DateTime.now(),
+      ),
+    );
   }
 
   /// User chấp nhận giao dịch → lưu vào chi tiêu
@@ -317,13 +342,14 @@ class AutoExpenseService with WidgetsBindingObserver {
     final notification = _pendingNotifications[index];
     try {
       var expense = notification.toExpenseModel();
-      
+
       // Handle Internal Transfer: Amount = 0
       if (notification.linkedTransactionId != null) {
         expense = expense.copyWith(
           amount: 0,
           type: TransactionType.expense, // Or keep as is, effectively 0
-          note: '${expense.note}\n(Chuyển khoản nội bộ: ${notification.amount.toCurrency})',
+          note:
+              '${expense.note}\n(Chuyển khoản nội bộ: ${notification.amount.toCurrency})',
         );
       }
 
@@ -339,17 +365,19 @@ class AutoExpenseService with WidgetsBindingObserver {
         } else {
           // If internal transfer -> No change (amount 0 effect)
           if (notification.linkedTransactionId != null) {
-             newBalance = currentBalance;
+            newBalance = currentBalance;
           } else {
-             newBalance = notification.isIncoming 
-                ? currentBalance + notification.amount 
+            newBalance = notification.isIncoming
+                ? currentBalance + notification.amount
                 : currentBalance - notification.amount;
           }
         }
         await _storage!.setTotalBalance(newBalance);
       }
 
-      _pendingNotifications[index] = notification.copyWith(isAutoRecorded: true);
+      _pendingNotifications[index] = notification.copyWith(
+        isAutoRecorded: true,
+      );
       _saveHistory();
       return true;
     } catch (e) {
@@ -388,7 +416,10 @@ class AutoExpenseService with WidgetsBindingObserver {
     try {
       final List<dynamic> jsonList = jsonDecode(historyJson);
       _pendingNotifications = jsonList
-          .map((json) => BankNotificationModel.fromMap(json as Map<String, dynamic>))
+          .map(
+            (json) =>
+                BankNotificationModel.fromMap(json as Map<String, dynamic>),
+          )
           .toList();
     } catch (e) {
       debugPrint('❌ Error loading notification history: $e');
@@ -423,7 +454,7 @@ class AutoExpenseService with WidgetsBindingObserver {
         timestamp: now.subtract(const Duration(hours: 1)),
       ),
     ];
-    
+
     _pendingNotifications.insertAll(0, mocks);
     _saveHistory();
     for (var mock in mocks) {

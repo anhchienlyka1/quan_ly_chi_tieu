@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'app/app.dart';
 import 'core/constants/env_config.dart';
 import 'data/providers/expense_provider.dart';
+import 'data/providers/gold_provider.dart';
 import 'theme/theme_provider.dart';
 import 'data/services/notification_service.dart';
 import 'data/services/background_check_task.dart';
@@ -44,8 +45,13 @@ void main() async {
   ]);
 
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => ExpenseProvider()..loadExpenses(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) => ExpenseProvider()..loadExpenses(),
+        ),
+        ChangeNotifierProvider(create: (_) => GoldProvider()),
+      ],
       child: const QuanLyChiTieuApp(),
     ),
   );

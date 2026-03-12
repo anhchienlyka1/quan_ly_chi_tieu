@@ -75,4 +75,23 @@ class AppColors {
 
   static const Color aiGlow = Color(0xFF6C63FF);
   static const Color aiAccent = Color(0xFF00D2D3);
+
+  // Gold Feature Colors
+  static const Color goldPrimary = Color(0xFFD4AF37);
+  static const Color goldShimmer = Color(0xFFF5E176);
+  static const Color goldDark = Color(0xFF9F7A1B);
+  static const Color goldMuted = Color(0xFFF0E68C);
+
+  static const LinearGradient goldGradient = LinearGradient(
+    colors: [Color(0xFFD4AF37), Color(0xFFF5E176), Color(0xFFD4AF37)],
+    stops: [0.0, 0.5, 1.0],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient goldCardGradient = LinearGradient(
+    colors: [Color(0xFF2C1F00), Color(0xFF3D2A00)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 }
