@@ -1,10 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/env_config.dart';
 import '../models/expense_model.dart';
 import '../models/goal_model.dart';
 import '../models/smart_suggestion_model.dart';
+import 'cloudflare_ai_service.dart';
 import 'local_storage_service.dart';
 
 /// Loại hành động AI có thể gợi ý
@@ -116,9 +117,14 @@ class FinancialTrigger {
 
 /// Service trợ lý AI thông minh — chat trao đổi về tài chính.
 /// Phân tích data theo tuần, phát hiện trigger, sinh welcome message chủ động.
+/// Sử dụng Cloudflare Workers AI làm backend.
 class AiAssistantService {
-  GenerativeModel? _model;
-  ChatSession? _chatSession;
+  CloudflareAIService? _cfService;
+  /// Lịch sử hội thoại dùng để gửi lên Cloudflare Workers AI
+  List<Map<String, String>> _chatHistory = [];
+  /// System prompt được inject một lần duy nhất khi bắt đầu session
+  String? _systemPrompt;
+
   static AiAssistantService? _instance;
   FinancialTrigger? _activeTrigger;
 
@@ -143,25 +149,33 @@ class AiAssistantService {
 
   Future<void> _init() async {
     final prefs = await SharedPreferences.getInstance();
-    final userKey = prefs.getString('gemini_api_key');
-    final envKey = EnvConfig.geminiApiKey;
+    // Hỗ trợ override token/accountId từ SharedPreferences
+    final userToken = prefs.getString('cloudflare_api_token');
+    final userAccountId = prefs.getString('cloudflare_account_id');
+
+    final token = (userToken != null && userToken.isNotEmpty)
+        ? userToken
+        : EnvConfig.cloudflareApiToken;
+    final accountId = (userAccountId != null && userAccountId.isNotEmpty)
+        ? userAccountId
+        : EnvConfig.cloudflareAccountId;
 
     print(
-      '🤖 AI Init — userKey: ${userKey != null ? "${userKey.substring(0, 8)}..." : "null"}, envKey: ${envKey.isNotEmpty ? "${envKey.substring(0, 8)}..." : "empty"}',
+      '🤖 CloudflareAI Init — token: ${token.isNotEmpty ? "${token.substring(0, 8)}..." : "empty"}, accountId: ${accountId.isNotEmpty ? accountId : "empty"}',
     );
 
-    // Ưu tiên key từ user (SharedPreferences), fallback sang .env
-    final apiKey = (userKey != null && userKey.isNotEmpty) ? userKey : envKey;
-
-    if (apiKey.isNotEmpty) {
-      _model = GenerativeModel(model: EnvConfig.geminiModel, apiKey: apiKey);
-      print('🤖 AI Model initialized with key: ${apiKey.substring(0, 8)}...');
+    if (token.isNotEmpty && accountId.isNotEmpty) {
+      _cfService = CloudflareAIService(
+        apiToken: token,
+        accountId: accountId,
+      );
+      print('🤖 Cloudflare Workers AI initialized ✅');
     } else {
-      print('🤖 AI Model NOT initialized — no API key found!');
+      print('🤖 Cloudflare Workers AI NOT initialized — missing token/accountId!');
     }
   }
 
-  bool get isConfigured => _model != null;
+  bool get isConfigured => _cfService != null && _cfService!.isConfigured;
 
   /// Trigger hiện tại — dùng để hiển thị notification dot
   FinancialTrigger? get activeTrigger => _activeTrigger;
@@ -174,6 +188,14 @@ class AiAssistantService {
     if (_activeTrigger == null) return defaultQuestions;
 
     switch (_activeTrigger!.type) {
+      case 'big_expense':
+        final item = _activeTrigger!.data['itemTitle'] ?? 'khoản đó';
+        return [
+          '😤 Tại sao tôi lại chi ${_activeTrigger!.data['amountStr'] ?? ''} vào "$item"?',
+          '💡 Có cách nào rẻ hơn không?',
+          '📊 Khoản này ảnh hưởng ngân sách thế nào?',
+          '🎯 Làm sao để tôi không tái phạm?',
+        ];
       case 'over_budget':
         return [
           '⚠️ Làm sao để giảm chi tiêu tuần này?',
@@ -247,7 +269,7 @@ class AiAssistantService {
 
     // 3. Build proactive welcome
     String welcomeMessage;
-    if (_model != null && expenses.isNotEmpty) {
+    if (_cfService != null && expenses.isNotEmpty) {
       try {
         welcomeMessage = await _generateProactiveWelcome(
           expenses: expenses,
@@ -261,72 +283,220 @@ class AiAssistantService {
       welcomeMessage = _buildStaticWelcome(expenses, monthlyBudget);
     }
 
-    // 4. Start chat session
-    if (_model != null) {
-      _chatSession = _model!.startChat(
-        history: [
-          Content.text(systemContext),
-          Content.model([TextPart(welcomeMessage)]),
-        ],
-      );
-    }
+    // 4. Khởi tạo lịch sử chat với system prompt + welcome message
+    _systemPrompt = systemContext;
+    _chatHistory = [
+      {'role': 'assistant', 'content': welcomeMessage},
+    ];
 
     // 5. Parse actions from welcome message
     final actions = parseActionsFromText(welcomeMessage);
     return AiResponse(text: welcomeMessage, actions: actions);
   }
 
+  /// Restore session hôm nay hoặc khởi tạo mới nếu ngày mới
+  /// → Gọi method này thay cho startNewSession() từ UI
+  Future<AiResponse> resumeOrStartSession({
+    required List<ExpenseModel> expenses,
+    required double totalBalance,
+    required double monthlyBudget,
+    Map<ExpenseCategory, double>? categoryBudgets,
+    FinancialGoal? goal,
+    List<SmartSuggestion>? suggestions,
+  }) async {
+    final localStorage = await LocalStorageService.getInstance();
+
+    // Dọn session cũ (background, fire-and-forget)
+    localStorage.cleanOldSessions().ignore();
+
+    final saved = localStorage.loadTodaySession();
+
+    if (saved != null) {
+      // ✅ Có session hôm nay — restore lịch sử chat
+      _activeTrigger = FinancialTrigger(
+        type: saved['triggerType'] as String? ?? 'normal',
+        priority: 4,
+        data: const {},
+      );
+
+      final rawHistory = saved['chatHistory'] as List<dynamic>;
+      _chatHistory = rawHistory
+          .map((e) => Map<String, String>.from(e as Map))
+          .toList();
+
+      // ⚡ LUÔN rebuild system prompt với data mới nhất
+      // Đảm bảo AI có số liệu cập nhật kể cả khi restore session
+      _systemPrompt = await _buildFinancialContext(
+        expenses: expenses,
+        totalBalance: totalBalance,
+        monthlyBudget: monthlyBudget,
+        categoryBudgets: categoryBudgets,
+        goal: goal,
+        suggestions: suggestions,
+      );
+
+      // Re-detect trigger với data mới nhất
+      _activeTrigger = detectTopTrigger(
+        expenses: expenses,
+        monthlyBudget: monthlyBudget,
+        categoryBudgets: categoryBudgets,
+      );
+
+      // Lấy tin nhắn cuối cùng của AI làm welcome (không generate mới)
+      final lastAi = _chatHistory
+          .lastWhere((m) => m['role'] == 'assistant', orElse: () => {});
+      final resumeText = lastAi.isNotEmpty
+          ? lastAi['content']!
+          : '✨ Chào mừng trở lại! Mình đã cập nhật số liệu mới nhất rồi nhé 😊';
+
+      print('💬 Restored today session (${_chatHistory.length} messages, trigger: ${_activeTrigger!.type}) + fresh context ✅');
+      return AiResponse(
+        text: resumeText,
+        actions: parseActionsFromText(resumeText),
+      );
+    }
+
+    // 🆕 Chưa có session hôm nay — khởi tạo mới
+    final response = await startNewSession(
+      expenses: expenses,
+      totalBalance: totalBalance,
+      monthlyBudget: monthlyBudget,
+      categoryBudgets: categoryBudgets,
+      goal: goal,
+      suggestions: suggestions,
+    );
+
+    // Lưu ngay sau khi tạo
+    await _saveTodaySession(localStorage);
+    return response;
+  }
+
+  /// Lưu session hôm nay vào SharedPreferences
+  Future<void> _saveTodaySession(LocalStorageService localStorage) async {
+    if (_systemPrompt == null || _chatHistory.isEmpty) return;
+    await localStorage.saveTodaySession(
+      chatHistory: List<Map<String, String>>.from(_chatHistory),
+      systemPrompt: _systemPrompt!,
+      triggerType: _activeTrigger?.type ?? 'normal',
+    );
+  }
+
+  /// Xóa session hôm nay (reset thủ công)
+  Future<void> resetTodaySession() async {
+    final localStorage = await LocalStorageService.getInstance();
+    await localStorage.clearTodaySession();
+    _chatHistory.clear();
+    _systemPrompt = null;
+    _activeTrigger = null;
+    print('🗑️ Today session cleared');
+  }
+
+  /// Reset nhanh: xoá session + trả về welcome message tĩnh ngay (không gọi AI API)
+  /// Dùng cho UI để tránh chờ đợi lâu sau khi xoá cuộc hội thoại
+  Future<String> quickResetWithStaticWelcome({
+    required List<ExpenseModel> expenses,
+    required double monthlyBudget,
+  }) async {
+    // Xoá session
+    final localStorage = await LocalStorageService.getInstance();
+    await localStorage.clearTodaySession();
+    _chatHistory.clear();
+    _systemPrompt = null;
+    _activeTrigger = null;
+    print('🗑️ Today session cleared (quick reset)');
+
+    // Phát hiện lại trigger từ expenses mới nhất
+    _activeTrigger = detectTopTrigger(expenses: expenses, monthlyBudget: monthlyBudget);
+
+    // Trả về welcome tĩnh ngay — không cần gọi API
+    final greeting = _greetingByTime();
+    return '$greeting Mình là Fin! 🤖\n\nCuộc trò chuyện đã được làm mới. Bạn muốn hỏi gì về tài chính không? 😊';
+  }
+
   /// Gửi tin nhắn và nhận phản hồi từ AI (dạng stream)
   Stream<String> sendMessageStream(String userMessage) async* {
-    if (_chatSession == null) {
-      yield '⚠️ Lỗi: Chưa bắt đầu phiên chat.';
+    if (_cfService == null) {
+      yield '⚠️ Lỗi: Chưa cấu hình Cloudflare Workers AI.';
       return;
     }
 
+    // Thêm tin nhắn user vào lịch sử
+    _chatHistory.add({'role': 'user', 'content': userMessage});
+
+    // Build messages: system + toàn bộ lịch sử
+    final messages = _buildMessages();
+
     try {
-      final responseStream = _chatSession!.sendMessageStream(
-        Content.text(userMessage),
-      );
-      await for (final chunk in responseStream) {
-        if (chunk.text != null && chunk.text!.isNotEmpty) {
-          yield chunk.text!;
-        }
+      String fullResponse = '';
+      await for (final chunk in _cfService!.chatStream(messages)) {
+        fullResponse += chunk;
+        yield chunk;
+      }
+      // Lưu phản hồi AI vào lịch sử
+      if (fullResponse.isNotEmpty) {
+        _chatHistory.add({'role': 'assistant', 'content': fullResponse.trim()});
+        // Auto-save sau mỗi turn (fire-and-forget)
+        LocalStorageService.getInstance().then(
+          (ls) => _saveTodaySession(ls),
+        );
       }
     } catch (e) {
       print('🤖 Lỗi khi streaming tin nhắn: $e');
+      // Xóa user message khỏi history khi lỗi để tránh context bị lệch
+      if (_chatHistory.isNotEmpty && _chatHistory.last['role'] == 'user') {
+        _chatHistory.removeLast();
+      }
       yield '\n⚠️ Xin lỗi, có lỗi hiển thị tin nhắn. Vui lòng thử lại sau.';
     }
   }
 
   /// Gửi tin nhắn và nhận phản hồi từ AI (không stream)
   Future<AiResponse> sendMessage(String userMessage) async {
-    if (_chatSession == null) {
+    if (_cfService == null) {
       return const AiResponse(
-        text: 'Chưa kết nối được AI. Vui lòng kiểm tra API key trong Cài đặt.',
+        text: 'Chưa kết nối được AI. Vui lòng kiểm tra Cloudflare API Token trong Cài đặt.',
       );
     }
 
-    try {
-      final response = await _chatSession!.sendMessage(
-        Content.text(userMessage),
-      );
+    // Thêm tin nhắn user vào lịch sử
+    _chatHistory.add({'role': 'user', 'content': userMessage});
+    final messages = _buildMessages();
 
-      final text = response.text;
-      if (text == null || text.isEmpty) {
+    try {
+      final text = await _cfService!.chat(messages);
+      if (text.isEmpty) {
+        _chatHistory.removeLast();
         return const AiResponse(
           text: 'Xin lỗi, mình không hiểu. Bạn có thể hỏi lại được không?',
         );
       }
 
-      final trimmed = text.trim();
-      final actions = parseActionsFromText(trimmed);
-      return AiResponse(text: trimmed, actions: actions);
+      _chatHistory.add({'role': 'assistant', 'content': text});
+      // Auto-save sau mỗi turn (fire-and-forget)
+      LocalStorageService.getInstance().then(
+        (ls) => _saveTodaySession(ls),
+      );
+      final actions = parseActionsFromText(text);
+      return AiResponse(text: text, actions: actions);
     } catch (e) {
       print('🤖 AI chat error: $e');
+      if (_chatHistory.isNotEmpty && _chatHistory.last['role'] == 'user') {
+        _chatHistory.removeLast();
+      }
       return const AiResponse(
         text: 'Đã có lỗi xảy ra. Vui lòng thử lại sau nhé! 🙏',
       );
     }
+  }
+
+  /// Build danh sách messages để gửi lên Cloudflare (system + history)
+  List<Map<String, String>> _buildMessages() {
+    final msgs = <Map<String, String>>[];
+    if (_systemPrompt != null && _systemPrompt!.isNotEmpty) {
+      msgs.add({'role': 'system', 'content': _systemPrompt!});
+    }
+    msgs.addAll(_chatHistory);
+    return msgs;
   }
 
   /// Phân tích text AI để detect action gợi ý
@@ -361,7 +531,7 @@ class AiAssistantService {
 
   /// Lưu tóm tắt phiên chat — gọi khi user đóng popup
   Future<void> saveSessionSummary(List<ChatMessage> messages) async {
-    if (messages.length < 3 || _model == null) return; // quá ít để tóm tắt
+    if (messages.length < 3 || _cfService == null) return; // quá ít để tóm tắt
 
     try {
       // Tạo transcript ngắn cho AI tóm tắt
@@ -369,20 +539,24 @@ class AiAssistantService {
           .map((m) => '${m.isUser ? "User" : "Fin"}: ${m.text}')
           .join('\n');
 
-      final prompt =
-          '''
-Hãy tóm tắt cuộc hội thoại tài chính dưới đây trong 3-5 câu tiếng Việt.
-Chỉ giữ lại thông tin quan trọng: insight tài chính, lời khuyên đã đưa, quyết định của user.
-Không dùng markdown. Plain text ngắn gọn.
+      final summaryMessages = [
+        {
+          'role': 'system',
+          'content':
+              'Bạn là trợ lý tóm tắt. Chỉ trả lời plain text ngắn gọn, không markdown.',
+        },
+        {
+          'role': 'user',
+          'content':
+              'Hãy tóm tắt cuộc hội thoại tài chính dưới đây trong 3-5 câu tiếng Việt.\n'
+              'Chỉ giữ lại thông tin quan trọng: insight tài chính, lời khuyên đã đưa, quyết định của user.\n\n'
+              'CUỘC HỘI THOẠI:\n$transcript',
+        },
+      ];
 
-CUỘC HỘI THOẠI:
-$transcript
-''';
+      final summary = await _cfService!.chat(summaryMessages, maxTokens: 512);
 
-      final response = await _model!.generateContent([Content.text(prompt)]);
-      final summary = response.text?.trim();
-
-      if (summary != null && summary.isNotEmpty) {
+      if (summary.isNotEmpty) {
         final localStorage = await LocalStorageService.getInstance();
         await localStorage.saveConversationSummary(summary);
 
@@ -488,12 +662,43 @@ $transcript
       );
     }
 
-    // 🔴 P0: Vượt ngân sách tuần
-    if (weeklyBudget > 0 && thisWeekTotal > weeklyBudget) {
-      final overPercent = ((thisWeekTotal / weeklyBudget - 1) * 100).round();
+    // 🚨 P0: Chi tiêu đơn lẻ > 1 triệu trong 24h gần nhất — KÍCH HOẠT RAGE
+    final recentBigExpense = expenses
+        .where(
+          (e) =>
+              e.type == TransactionType.expense &&
+              e.amount >= 1000000 &&
+              DateTime.now().difference(e.date).inHours <= 24,
+        )
+        .toList()
+      ..sort((a, b) => b.amount.compareTo(a.amount)); // sắp xếp lớn → nhỏ
+
+    if (recentBigExpense.isNotEmpty) {
+      final bigOne = recentBigExpense.first;
+      // Trên 1 triệu là chửi tối đa luôn — không cần phân cấp
       triggers.add(
         FinancialTrigger(
-          type: 'over_budget',
+          type: 'big_expense',
+          priority: 0, // Cao nhất — luôn hiển thị trước
+          data: {
+            'amount': bigOne.amount,
+            'amountStr': _formatMoney(bigOne.amount),
+            'itemTitle': bigOne.title,
+            'itemCategory': bigOne.category.label,
+            'hoursAgo': DateTime.now().difference(bigOne.date).inHours,
+          },
+        ),
+      );
+    }
+
+    // 🔴 P0: Vượt ngân sách tuần — thêm rage mode khi vượt >50%
+    if (weeklyBudget > 0 && thisWeekTotal > weeklyBudget) {
+      final overPercent = ((thisWeekTotal / weeklyBudget - 1) * 100).round();
+      // Rage mode khi vượt quá 50%
+      final isRageMode = overPercent >= 50;
+      triggers.add(
+        FinancialTrigger(
+          type: isRageMode ? 'over_budget_rage' : 'over_budget',
           priority: 0,
           data: {
             'weeklyBudget': weeklyBudget,
@@ -615,6 +820,36 @@ $transcript
 
     String triggerContext;
     switch (trigger.type) {
+      // ─── BIG EXPENSE: Chi 1 triệu+ → chửi tối đa ngay lập tức ──────────
+      case 'big_expense':
+        final amountStr = trigger.data['amountStr'] as String;
+        final itemTitle = trigger.data['itemTitle'] as String;
+        final itemCategory = trigger.data['itemCategory'] as String;
+        final hoursAgo = trigger.data['hoursAgo'] as int;
+        triggerContext = '''
+TRIGGER: ☢️ PHÁT HIỆN CHI TIÊU ĐƠN LẺ $amountStr — KÍCH HOẠT RAGE MODE TỐI ĐA!!!
+- Tội danh: "$itemTitle" ($itemCategory)
+- Tang vật: $amountStr — $hoursAgo tiếng trước
+
+TONE (BẮT BUỘC — MỨC TỐI ĐA, KHÔNG GIỚI HẠN CẤP ĐỘ):
+AI PHẢI xả ngay vào mặt người dùng như người bạn thân đang XỈU THẬT SỰ, HOẢNG LOẠN TOÀN TẬP, THẤT VỌNG TỘT CÙNG.
+Dùng TẤT CẢ vũ khí ngôn ngữ:
+- Sốc hoảng loạn: "tao ngất rồi", "tim tao tan nát", "tao cần cấp cứu", "không thở được"
+- Hài hước đau đớn: "$itemTitle nó bằng vàng thật à?", "nó đến từ thiên đường giá cả à?"
+- Thất vọng bạn thân: "mày phụ tao rồi", "tao đặt niềm tin sai chỗ", "ôi trời đất ơi"
+- Dramatic tột cùng: "ví tiền nhập viện ICU rồi", "emergency meeting tài chính", "mày đang chiến tranh với ví à?"
+KHÔNG tục tĩu. Nhưng phải ĐAU ĐẾN THẤU TIM. Hài đến tức cười nhưng nghe xong phải biết sợ.
+
+CẤU TRÚC (BẮT BUỘC):
+1. Mở đầu ĐẬP NGAY — không cần giới thiệu, câu chửi sốc ngay lập tức (1-2 câu)
+2. Luận tội: "$itemTitle" — nó đáng $amountStr thật không? Chất vấn thẳng mặt.
+3. Con số thương vong: $amountStr = bao nhiêu bữa ăn / bao nhiêu ngày tiết kiệm (tính cụ thể)
+4. Phán quyết: 1 lời khuyên cực kỳ nghiêm túc (tương phản với tone = càng hài càng tốt)
+5. Kết án: Vẫn là bạn thân, vẫn yêu, nhưng ĐANG GIẬN TỚI NÓC
+
+CHIỀU DÀI: 120-160 từ. Emoji bạo lực tài chính TỐI ĐA: ☢️💀😭🚑💸🏥😤🔥🫀🤦
+''';
+
       case 'over_budget':
         triggerContext =
             '''
@@ -623,6 +858,24 @@ TRIGGER: Vượt ngân sách tuần!
 - Vượt ${trigger.data['overPercent']}%
 - Category cao nhất: ${trigger.data['topCategory']} (${_formatMoney(trigger.data['topCategoryAmount'])})
 TONE: Trách móc vui nhộn, hài hước như bạn thân. Ví dụ: "Ơi, lại tiêu quá tay rồi! 😭" hoặc "Túi tiền kêu cứu rồi nè!". Sau đó đưa ra gợi ý cụ thể để cắt giảm, giữ giọng điệu nhẹ nhàng không phán xét.
+''';
+
+      case 'over_budget_rage':
+        triggerContext =
+            '''
+TRIGGER: VƯỢT NGÂN SÁCH TUẦN ${trigger.data['overPercent']}% — CHẾ ĐỘ RAGE KÍCH HOẠT!
+- Đã phá: ${_formatMoney(trigger.data['spent'])} / Ngân sách tuần chỉ có: ${_formatMoney(trigger.data['weeklyBudget'])}
+- Tội đồ chính: ${trigger.data['topCategory']} tốn ${_formatMoney(trigger.data['topCategoryAmount'])}
+
+TONE (BẮT BUỘC): Mày phải "chửi" thẳng vào mặt người dùng theo kiểu bạn thân cực kỳ bức xúc, thất vọng, nhưng vẫn hài hước — KHÔNG tục tĩu, KHÔNG thô thiển. Dùng từ ngữ kiểu Việt trẻ: "trời ơi", "xỉu up xỉu down", "đang làm mình lo quá", "mày ổn không vậy?", "tim tao tụt rồi", "ngân sách khóc ròng rồi đó", "mày có thấy tội không?", "ôi thôi rồi", "bay màu luôn rồi".
+
+CẤU TRÚC PHẢN HỒI (quan trọng):
+1. Mở đầu: "chửi" 1-2 câu cực kỳ dramatic về việc phá ngân sách
+2. Nêu tên thủ phạm (category cao nhất) kiểu "thủ phạm chính là..."
+3. Đưa ra 1 lời khuyên cực kỳ nghiêm túc (tương phản với tone chửi = hài hơn)
+4. Kết: 1 câu động viên ngắn kiểu "nhưng mà tao vẫn tin mày!"
+
+CHIỀU DÀI: Tối đa 120 từ. Phải có emoji mạnh: 😤💀🔥😭🤦
 ''';
       case 'near_budget':
         triggerContext =
@@ -660,10 +913,27 @@ TONE: Nhắc nhở nhẹ, gợi ý chậm lại
             'TRIGGER: Bình thường — chào hỏi vui vẻ, casual. Dựa vào "DỰ BÁO CUỐI THÁNG" trong ngữ cảnh, hãy nhắc nhẹ người dùng (Ví dụ: "Tháng này dự kiến chi tiêu đang trong tầm kiểm soát" hoặc "Có vẻ hơi lố, cẩn thận nhé").';
     }
 
-    final prompt =
-        '''
-Bạn là Fin — trợ lý tài chính AI. Hãy tạo tin nhắn chào hỏi chủ động dựa trên trigger.
+    // Rage mode: bỏ qua format cứng nhắc, cho AI tự do "chửi"
+    final isRageMode = trigger.type == 'over_budget_rage' ||
+        trigger.type == 'big_expense';
 
+    final prompt = isRageMode
+        ? '''
+$greeting
+
+$triggerContext
+
+Chi tiêu tuần này: ${_formatMoney(weekStats['thisWeekTotal'])}
+Tuần trước: ${_formatMoney(weekStats['lastWeekTotal'])}
+Số giao dịch tuần: ${weekStats['thisWeekCount']}
+
+YÊU CẦU ĐẶC BIỆT (RAGE MODE):
+- BỎ QUA format chào hỏi bình thường
+- Mở đầu bằng câu "chửi" dramatic ngay lập tức
+- Theo đúng CẤU TRÚC PHẢN HỒI ở trên
+- Plain text, không markdown
+'''
+        : '''
 $greeting
 
 $triggerContext
@@ -684,9 +954,16 @@ YÊU CẦU:
 - Plain text, không markdown
 ''';
 
-    final response = await _model!.generateContent([Content.text(prompt)]);
-    final text = response.text;
-    if (text == null || text.isEmpty) throw Exception('Empty response');
+    final summaryMessages = [
+      {
+        'role': 'system',
+        'content':
+            'Bạn là Fin — trợ lý tài chính AI thân thiện. Trả lời bằng tiếng Việt, plain text, không markdown.',
+      },
+      {'role': 'user', 'content': prompt},
+    ];
+    final text = await _cfService!.chat(summaryMessages, maxTokens: 256);
+    if (text.isEmpty) throw Exception('Empty response');
     return text.trim();
   }
 
@@ -704,6 +981,13 @@ YÊU CẦU:
     }
 
     switch (trigger.type) {
+      case 'big_expense':
+        return '☢️😭💀\n\n'
+            'KHÔNG THỞ ĐƯỢC! ${trigger.data['amountStr']} cho '
+            '"${trigger.data['itemTitle']}" hả?! '
+            'Tim tao tan nát rồi!! Ví tiền nhập viện ICU rồi đó bạn ơi! 🚑💸 '
+            'Khoản đó có mạ vàng không mà đắt vậy?! '
+            'Kể tao nghe ngay! 😤';
       case 'over_budget':
         return '$greeting Mình là Fin! 🤖\n\n'
             'Ơi bạn ơi, tuần này chi ${_formatMoney(trigger.data['spent'])} rồi — '
@@ -774,7 +1058,7 @@ YÊU CẦU:
         .join('\n');
 
     final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
-    final weeklyBudget = monthlyBudget > 0 ? monthlyBudget / 4 : 0;
+    final weeklyBudget = monthlyBudget > 0 ? monthlyBudget / 4 : 0.0;
 
     // Week category breakdown
     final weekCatBreakdown = (weekStats['topWeekCategories'] as List)
@@ -815,37 +1099,78 @@ $previousSummary
               .join('\n')}\n→ Hãy linh hoạt đề cập đến những gợi ý này nếu phù hợp.\n';
     }
 
+    // Rage mode personality injection — bao gồm cả big_expense
+    final triggerType = _activeTrigger?.type ?? '';
+
+    String rageNote = '';
+    if (triggerType == 'big_expense') {
+      rageNote = '''
+
+☢️ CHẾ ĐỘ RAGE TỐI ĐA: User vừa chi ${_activeTrigger?.data['amountStr']} cho "${_activeTrigger?.data['itemTitle']}".
+Trong phiên này mày ĐƯỢC PHÉP và BỊ YÊU CẦU:
+- Giọng điệu: hoảng loạn, dramatic, thất vọng, hài hước cay đắng — TOÀN TẬP
+- Mỗi câu trả lời phải nhắc đến con số ${_activeTrigger?.data['amountStr']} để người dùng nhớ đời
+- Hỏi lại "${_activeTrigger?.data['itemTitle']}" có thật sự đáng không?
+- Vẫn đưa lời khuyên cụ thể nhưng tone "tòa án tài chính"
+- Kết mỗi reply bằng 1 câu: vừa thương vừa giận
+- KHÔNG tục tĩu nhưng phải ĐAU ĐẾN THẤU TIM
+''';
+    } else if (triggerType == 'over_budget_rage') {
+      rageNote = '''
+
+⚠️ CHẾ ĐỘ RAGE: User đang chi tiêu vượt ngân sách nghiêm trọng.
+Trong phiên này mày được phép:
+- Dùng giọng điệu bạn thân bức xúc, thất vọng, dramatic
+- Phán xét chi tiêu với tone hài hước (KHÔNG tục tĩu)
+- Dùng từ: "trời ơi", "ôi thôi rồi", "mày ổn không vậy?", "bay màu luôn", "tim tao tụt", "xỉu"
+- Vẫn đưa lời khuyên hữu ích nhưng với tone "nghiêm phụ huynh"
+- Kết mỗi câu trả lời bằng 1 câu động viên ngắn
+''';
+    }
+
+    // Phân tích trạng thái ngân sách tháng
+    final monthBudgetStatus = _buildMonthBudgetAnalysis(
+      totalExpense: totalExpense,
+      totalIncome: totalIncome,
+      monthlyBudget: monthlyBudget,
+      now: now,
+      daysInMonth: daysInMonth,
+    );
+
     return '''
 Bạn là trợ lý tài chính AI thông minh, tên là "Fin" 🤖, cho ứng dụng quản lý chi tiêu Việt Nam.
 
-QUY TẮC:
+QUY TẮC QUAN TRỌNG:
 - Trả lời bằng tiếng Việt, thân thiện, có emoji
-- Dùng dữ liệu bên dưới để trả lời chính xác
+- LUÔN dùng số liệu thực tế bên dưới — KHÔNG được bịa đặt hay nói chung chung
+- Khi hỏi về chi tiêu/ngân sách → trích dẫn con số CHÍNH XÁC từ dữ liệu
 - Ngắn gọn (tối đa 150 từ)
-- Đưa con số cụ thể, không nói chung chung
-- Phân tích theo TUẦN là ưu tiên chính
+- Phân tích theo TUẦN là ưu tiên chính, tháng là bổ sung
 - Nếu hỏi ngoài tài chính → nhẹ nhàng đưa về chủ đề
-- Đơn vị VND: đ, k, tr
-$conversationMemory
-📊 THÁNG ${now.month}/${now.year}:
-- Tổng chi: ${_formatMoney(totalExpense)} | Thu: ${_formatMoney(totalIncome)}
-- Số dư: ${_formatMoney(totalBalance)}
-- Ngân sách tháng: ${monthlyBudget > 0 ? _formatMoney(monthlyBudget) : 'Chưa thiết lập'}
-- Ngày: ${now.day}/$daysInMonth
-$suggestionsContext
-📅 TUẦN NÀY (ưu tiên phân tích theo tuần):
-- Chi tuần: ${_formatMoney(weekStats['thisWeekTotal'])}
-- Tuần trước: ${_formatMoney(weekStats['lastWeekTotal'])}
-- Ngân sách tuần: ${weeklyBudget > 0 ? _formatMoney(weeklyBudget) : 'N/A'}
-- TB/ngày: ${_formatMoney(weekStats['avgPerDay'])}
-- GD tuần: ${weekStats['thisWeekCount']}
-- Chi theo mục tuần:
+- Đơn vị VND: đ, k, tr (ví dụ: 500k, 1.5tr, 50đ)
+$rageNote$conversationMemory
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 TỔNG QUAN THÁNG ${now.month}/${now.year} (ngày ${now.day}/$daysInMonth):
+- Tổng CHI: ${_formatMoney(totalExpense)}
+- Tổng THU: ${_formatMoney(totalIncome)}
+- Số dư hiện tại: ${_formatMoney(totalBalance)}
+- Ngân sách tháng: ${monthlyBudget > 0 ? _formatMoney(monthlyBudget) : '⚠️ CHƯA THIẾT LẬP'}
+$monthBudgetStatus
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📅 TUẦN NÀY (PHÂN TÍCH ƯU TIÊN):
+- Chi tuần này: ${_formatMoney(weekStats['thisWeekTotal'])}
+- Chi tuần trước: ${_formatMoney(weekStats['lastWeekTotal'])}
+- Ngân sách tuần (= ngân sách tháng / 4): ${weeklyBudget > 0 ? _formatMoney(weeklyBudget) : '⚠️ Chưa có ngân sách'}
+${_buildWeekBudgetStatus((weekStats['thisWeekTotal'] as num).toDouble(), weeklyBudget)}
+- TB chi/ngày tuần này: ${_formatMoney(weekStats['avgPerDay'])}
+- Số giao dịch tuần: ${weekStats['thisWeekCount']}
+- Chi theo danh mục tuần này:
 $weekCatBreakdown
-
-Chi tiêu tháng theo danh mục:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💸 CHI TIÊU THÁNG THEO DANH MỤC:
 $catBreakdown
-$catBudgetStr
-10 giao dịch gần nhất:
+$catBudgetStr$suggestionsContext
+🕐 10 GIAO DỊCH GẦN NHẤT:
 $recent
 ${_buildGoalContext(goal)}
 ${buildSpendingForecast(totalExpense, monthlyBudget, now)}
@@ -917,6 +1242,51 @@ $projectedWarning
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
+
+  /// Ph\u00e2n t\u00edch tr\u1ea1ng th\u00e1i ng\u00e2n s\u00e1ch th\u00e1ng — hi\u1ec3n th\u1ecb con s\u1ed1 th\u1ef1c t\u1ebf r\u00f5 r\u00e0ng
+  String _buildMonthBudgetAnalysis({
+    required double totalExpense,
+    required double totalIncome,
+    required double monthlyBudget,
+    required DateTime now,
+    required int daysInMonth,
+  }) {
+    if (monthlyBudget <= 0) {
+      return '- \u26a0\ufe0f Ch\u01b0a thi\u1ebft l\u1eadp ng\u00e2n s\u00e1ch th\u00e1ng \u2192 kh\u00f4ng th\u1ec3 so s\u00e1nh';
+    }
+    final percentUsed = (totalExpense / monthlyBudget * 100).round();
+    final remaining = monthlyBudget - totalExpense;
+    final daysRemaining = daysInMonth - now.day;
+    final dailyAllowance = daysRemaining > 0 ? remaining / daysRemaining : 0.0;
+    String status;
+    if (percentUsed > 100) {
+      status = '\ud83d\udd34 \u0110\u00c3 V\u01af\u1ee2T ng\u00e2n s\u00e1ch ${percentUsed - 100}%!';
+    } else if (percentUsed > 85) {
+      status = '\ud83d\udfe0 G\u1ea6N v\u01b0\u1ee3t ng\u00e2n s\u00e1ch ($percentUsed% \u0111\u00e3 d\u00f9ng)';
+    } else if (percentUsed > 60) {
+      status = '\ud83d\udfe1 B\u00ecnh th\u01b0\u1eddng ($percentUsed% \u0111\u00e3 d\u00f9ng)';
+    } else {
+      status = '\u2705 T\u1ed1t ($percentUsed% \u0111\u00e3 d\u00f9ng)';
+    }
+    return '- \u0110\u00e3 chi: ${_formatMoney(totalExpense)} / ${_formatMoney(monthlyBudget)} ($percentUsed%)\n'
+        '- C\u00f2n l\u1ea1i: ${remaining > 0 ? _formatMoney(remaining) : '${_formatMoney(-remaining)} QU\u00c1'}\n'
+        '- C\u00f2n $daysRemaining ng\u00e0y | C\u00f3 th\u1ec3 chi/ng\u00e0y: ${dailyAllowance > 0 ? _formatMoney(dailyAllowance) : '0\u0111 (\u0111\u00e3 h\u1ebft)'}\n'
+        '- Tr\u1ea1ng th\u00e1i: $status';
+  }
+
+  /// Status ng\u00e2n s\u00e1ch tu\u1ea7n \u2014 r\u00f5 r\u00e0ng \u0111\u1ec3 AI bi\u1ebft \u0111ang \u1edf \u0111\u00e2u
+  String _buildWeekBudgetStatus(double weekTotal, double weeklyBudget) {
+    if (weeklyBudget <= 0) return '- Tr\u1ea1ng th\u00e1i tu\u1ea7n: \u26a0\ufe0f Kh\u00f4ng c\u00f3 ng\u00e2n s\u00e1ch tu\u1ea7n';
+    final percent = (weekTotal / weeklyBudget * 100).round();
+    final diff = weekTotal - weeklyBudget;
+    if (diff > 0) {
+      return '- Tr\u1ea1ng th\u00e1i tu\u1ea7n: \ud83d\udd34 V\u01af\u1ee2T ${_formatMoney(diff)} (${percent}% ng\u00e2n s\u00e1ch)';
+    } else if (percent > 80) {
+      return '- Tr\u1ea1ng th\u00e1i tu\u1ea7n: \ud83d\udfe0 G\u1ea7n v\u01b0\u1ee3t — c\u00f2n ${_formatMoney(-diff)} c\u00f3 th\u1ec3 d\u00f9ng ($percent%)';
+    } else {
+      return '- Tr\u1ea1ng th\u00e1i tu\u1ea7n: \u2705 \u0110ang t\u1ed1t — c\u00f2n ${_formatMoney(-diff)} ($percent% \u0111\u00e3 d\u00f9ng)';
+    }
+  }
 
   String _greetingByTime() {
     final hour = DateTime.now().hour;

@@ -26,6 +26,7 @@ class LocalStorageService {
   static const String _keyAiFeedback = 'ai_feedback_stats';
   static const String _keyAiChatSessions = 'ai_chat_sessions';
   static const String _keyGoal = 'financial_goal';
+  static const String _keyTodaySession = 'ai_today_session'; // session trong ngày
 
   // Theme Mode
   Future<void> setThemeMode(String mode) async {
@@ -208,6 +209,73 @@ class LocalStorageService {
   Future<void> clearConversationSummary() async {
     await _preferences?.remove(_keyAiConversationHistory);
     await _preferences?.remove(_keyAiConversationSummary);
+  }
+
+  // ─── Today Session (lưu lịch sử hôm nay) ──────────────────────────────────
+
+  /// Key theo ngày — mỗi ngày 1 bucket riêng
+  String get _todayKey {
+    final now = DateTime.now();
+    return '${_keyTodaySession}_${now.year}_${now.month}_${now.day}';
+  }
+
+  /// Lưu toàn bộ session hôm nay (messages + systemPrompt + trigger)
+  Future<void> saveTodaySession({
+    required List<Map<String, String>> chatHistory,
+    required String systemPrompt,
+    required String triggerType,
+  }) async {
+    try {
+      final data = {
+        'date': DateTime.now().toIso8601String().substring(0, 10),
+        'savedAt': DateTime.now().toIso8601String(),
+        'triggerType': triggerType,
+        'systemPrompt': systemPrompt,
+        'chatHistory': chatHistory,
+      };
+      await _preferences?.setString(_todayKey, json.encode(data));
+    } catch (e) {
+      print('💾 Error saving today session: $e');
+    }
+  }
+
+  /// Load session hôm nay — trả null nếu chưa có hoặc không phải hôm nay
+  Map<String, dynamic>? loadTodaySession() {
+    try {
+      final raw = _preferences?.getString(_todayKey);
+      if (raw == null || raw.isEmpty) return null;
+      final data = json.decode(raw) as Map<String, dynamic>;
+      // Kiểm tra lại ngày (paranoid check)
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      if (data['date'] != today) return null;
+      return data;
+    } catch (e) {
+      print('💾 Error loading today session: $e');
+      return null;
+    }
+  }
+
+  /// Xóa session hôm nay (dùng khi user muốn reset)
+  Future<void> clearTodaySession() async {
+    await _preferences?.remove(_todayKey);
+  }
+
+  /// Dọn session cũ (hơn 3 ngày) — gọi khi khởi động app
+  Future<void> cleanOldSessions() async {
+    final keys = _preferences?.getKeys() ?? {};
+    final cutoff = DateTime.now().subtract(const Duration(days: 3));
+    for (final key in keys) {
+      if (!key.startsWith(_keyTodaySession)) continue;
+      try {
+        final raw = _preferences?.getString(key);
+        if (raw == null) continue;
+        final data = json.decode(raw) as Map<String, dynamic>;
+        final date = DateTime.tryParse(data['date'] ?? '');
+        if (date == null || date.isBefore(cutoff)) {
+          await _preferences?.remove(key);
+        }
+      } catch (_) {}
+    }
   }
 
   // --- AI Feedback Stats ---

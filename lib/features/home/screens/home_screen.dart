@@ -546,6 +546,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   suggestions: provider.suggestions,
                   onDismiss: (id) => provider.dismissSuggestion(id),
                   onOpenChat: _showAiAssistantPopup,
+                  onActionTap: (route) async {
+                    HapticFeedback.lightImpact();
+                    await Navigator.of(context).pushNamed(route);
+                    if (mounted) {
+                      // ignore: use_build_context_synchronously
+                      context.read<ExpenseProvider>().refresh();
+                    }
+                  },
                 )
                 .animate()
                 .fade(duration: 500.ms, delay: 300.ms)

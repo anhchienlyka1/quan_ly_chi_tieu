@@ -9,12 +9,14 @@ class AiInsightCard extends StatefulWidget {
   final List<SmartSuggestion> suggestions;
   final void Function(String id) onDismiss;
   final VoidCallback onOpenChat;
+  final void Function(String route)? onActionTap;
 
   const AiInsightCard({
     super.key,
     required this.suggestions,
     required this.onDismiss,
     required this.onOpenChat,
+    this.onActionTap,
   });
 
   @override
@@ -253,21 +255,45 @@ class _AiInsightCardState extends State<AiInsightCard> {
                       ),
                       if (suggestion.actionLabel != null) ...[
                         const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.25),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            suggestion.actionLabel!,
-                            style: GoogleFonts.outfit(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
+                        GestureDetector(
+                          onTap: suggestion.actionRoute != null
+                              ? () => widget.onActionTap?.call(suggestion.actionRoute!)
+                              : null,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.25),
+                              borderRadius: BorderRadius.circular(12),
+                              border: suggestion.actionRoute != null
+                                  ? Border.all(
+                                      color: Colors.white.withOpacity(0.5),
+                                      width: 1,
+                                    )
+                                  : null,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  suggestion.actionLabel!,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                if (suggestion.actionRoute != null) ...[
+                                  const SizedBox(width: 4),
+                                  const Icon(
+                                    Icons.arrow_forward_ios_rounded,
+                                    size: 9,
+                                    color: Colors.white,
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
                         ),

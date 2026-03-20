@@ -100,14 +100,69 @@ class _AiChatSheetState extends State<_AiChatSheet>
     }
   }
 
+  /// Xoá thủ công cuộc hội thoại hiện tại
+  Future<void> _resetConversation() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Xoá cuộc hội thoại?',
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Toàn bộ lịch sử trò chuyện hôm nay sẽ bị xoá. Bạn có chắc không?',
+          style: GoogleFonts.outfit(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('Huỷ', style: GoogleFonts.outfit()),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: Text('Xoá', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    HapticFeedback.mediumImpact();
+
+    // Dùng quickReset: xoá session + lấy welcome tĩnh ngay (không gọi AI API)
+    final welcomeText = await _service!.quickResetWithStaticWelcome(
+      expenses: widget.expenses,
+      monthlyBudget: widget.budgetProgress?.budget.totalBudget ?? 0,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _messages.clear();
+      _messages.add(ChatMessage(
+        text: welcomeText,
+        isUser: false,
+        timestamp: DateTime.now(),
+      ));
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+  }
+
   Future<void> _initChat() async {
     try {
       _service = await AiAssistantService.getInstance();
 
-      // Show typing indicator while AI generates proactive welcome
-      if (mounted) setState(() => _isAiTyping = true);
+      // Kiểm tra có session hôm nay chưa (không show typing nếu restore)
+      final localStorage = await LocalStorageService.getInstance();
+      final savedSession = localStorage.loadTodaySession();
+      final isRestoring = savedSession != null;
 
-      final aiResponse = await _service!.startNewSession(
+      // Chỉ show typing indicator khi tạo session mới (không phải restore)
+      if (!isRestoring && mounted) setState(() => _isAiTyping = true);
+
+      final aiResponse = await _service!.resumeOrStartSession(
         expenses: widget.expenses,
         totalBalance: widget.totalBalance,
         monthlyBudget: widget.budgetProgress?.budget.totalBudget ?? 0,
@@ -119,14 +174,34 @@ class _AiChatSheetState extends State<_AiChatSheet>
       if (mounted) {
         setState(() {
           _isAiTyping = false;
-          _messages.add(
-            ChatMessage(
-              text: aiResponse.text,
-              isUser: false,
-              timestamp: DateTime.now(),
-              actions: aiResponse.actions,
-            ),
-          );
+
+          if (isRestoring) {
+            // ─── Restore: hiển thị toàn bộ lịch sử hôm nay ───
+            _messages.clear();
+            final historyRaw = savedSession['chatHistory'] as List<dynamic>;
+            for (final msg in historyRaw) {
+              final m = Map<String, String>.from(msg as Map);
+              _messages.add(
+                ChatMessage(
+                  text: m['content'] ?? '',
+                  isUser: m['role'] == 'user',
+                  timestamp: DateTime.now(),
+                ),
+              );
+            }
+            // Scroll xuống cuối sau khi restore
+            WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+          } else {
+            // ─── Session mới: chỉ show welcome message ───
+            _messages.add(
+              ChatMessage(
+                text: aiResponse.text,
+                isUser: false,
+                timestamp: DateTime.now(),
+                actions: aiResponse.actions,
+              ),
+            );
+          }
         });
       }
     } catch (e) {
@@ -401,6 +476,22 @@ class _AiChatSheetState extends State<_AiChatSheet>
                   ],
                 ),
               ),
+              GestureDetector(
+                onTap: _resetConversation,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.delete_outline_rounded,
+                    size: 20,
+                    color: Colors.red.withOpacity(0.7),
+                  ),
+                ),
+              ),
+              const Gap(8),
               GestureDetector(
                 onTap: () {
                   HapticFeedback.lightImpact();
