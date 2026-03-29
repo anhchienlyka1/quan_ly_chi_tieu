@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import '../models/expense_model.dart';
+import '../models/fixed_expense_model.dart';
 import '../repositories/expense_repository.dart';
 import '../services/budget_service.dart';
+import '../services/fixed_expense_service.dart';
 import '../models/goal_model.dart';
 import '../models/smart_suggestion_model.dart';
 import '../services/local_storage_service.dart';
@@ -16,14 +18,16 @@ import '../services/smart_suggestion_service.dart';
 class ExpenseProvider extends ChangeNotifier {
   final ExpenseRepository _repository = ExpenseRepository();
   final BudgetService _budgetService = BudgetService();
-  final LocalStorageService _localStorageService =
-      LocalStorageService(); // Added LocalStorageService
+  final LocalStorageService _localStorageService = LocalStorageService();
+  late final FixedExpenseService _fixedExpenseService =
+      FixedExpenseService(_localStorageService);
 
   // ───────── State ─────────
   List<ExpenseModel> _expenses = [];
   BudgetProgress? _budgetProgress;
   FinancialGoal? _goal;
   List<SmartSuggestion> _suggestions = [];
+  List<FixedExpenseModel> _fixedExpenses = [];
   bool _isLoading = false;
   String? _error;
 
@@ -34,6 +38,13 @@ class ExpenseProvider extends ChangeNotifier {
   BudgetProgress? get budgetProgress => _budgetProgress;
   FinancialGoal? get goal => _goal;
   List<SmartSuggestion> get suggestions => List.unmodifiable(_suggestions);
+  List<FixedExpenseModel> get fixedExpenses => List.unmodifiable(_fixedExpenses);
+
+  /// Total of all active fixed expenses.
+  double get totalFixedExpenses => _fixedExpenseService.getTotalMonthly();
+
+  /// Income remaining after subtracting fixed expenses.
+  double get availableIncome => totalIncome - totalFixedExpenses;
 
   /// Current-month expenses (sorted newest first)
   List<ExpenseModel> get currentMonthExpenses {
@@ -73,6 +84,9 @@ class ExpenseProvider extends ChangeNotifier {
       all.sort((a, b) => b.date.compareTo(a.date));
 
       _expenses = all;
+
+      // Load fixed expenses
+      _fixedExpenses = _localStorageService.getFixedExpenses();
 
       // Get goal from LocalStorageService
       _goal = _localStorageService.getGoal();
@@ -164,4 +178,41 @@ class ExpenseProvider extends ChangeNotifier {
 
   /// Force a full reload (same as loadExpenses but semantically clearer).
   Future<void> refresh() => loadExpenses();
+
+  // ─── Fixed Expense CRUD ─────────────────────────────────────────────────────
+
+  Future<void> addFixedExpense(FixedExpenseModel item) async {
+    await _fixedExpenseService.add(item);
+    _fixedExpenses = _localStorageService.getFixedExpenses();
+    notifyListeners();
+  }
+
+  Future<void> updateFixedExpense(FixedExpenseModel item) async {
+    await _fixedExpenseService.update(item);
+    _fixedExpenses = _localStorageService.getFixedExpenses();
+    notifyListeners();
+  }
+
+  Future<void> deleteFixedExpense(String id) async {
+    await _fixedExpenseService.delete(id);
+    _fixedExpenses = _localStorageService.getFixedExpenses();
+    notifyListeners();
+  }
+
+  /// Import selected fixed expenses as real expense transactions for [month].
+  Future<void> importFixedExpenses(
+    List<FixedExpenseModel> selected,
+    DateTime month,
+  ) async {
+    final models = _fixedExpenseService.toExpenseModels(selected, month);
+    for (final m in models) {
+      await _repository.addExpense(m);
+    }
+    await _fixedExpenseService.markImportDone(month);
+    await loadExpenses();
+  }
+
+  /// Returns true if the monthly import dialog should be shown.
+  bool shouldShowFixedImportDialog() =>
+      _fixedExpenseService.shouldShowImportDialog(DateTime.now());
 }

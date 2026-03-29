@@ -1,6 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert'; // Required for json.decode and json.encode
 import '../models/goal_model.dart'; // Added as per instruction
+import '../models/fixed_expense_model.dart';
 import 'ai_assistant_service.dart'; // Import for ChatMessage
 
 /// Service for managing local key-value storage using SharedPreferences.
@@ -27,6 +28,8 @@ class LocalStorageService {
   static const String _keyAiChatSessions = 'ai_chat_sessions';
   static const String _keyGoal = 'financial_goal';
   static const String _keyTodaySession = 'ai_today_session'; // session trong ngày
+  static const String _keyFixedExpenses = 'fixed_expenses';
+  static const String _keyLastFixedImportMonth = 'last_fixed_import_month';
 
   // Theme Mode
   Future<void> setThemeMode(String mode) async {
@@ -333,5 +336,37 @@ class LocalStorageService {
         json.encode(goal.toJson()),
       ); // Changed to _preferences?
     }
+  }
+
+  // --- Fixed Expenses ---
+
+  /// Save full list of fixed expenses.
+  Future<void> saveFixedExpenses(List<FixedExpenseModel> items) async {
+    final list = items.map((e) => e.toMap()).toList();
+    await _preferences?.setString(_keyFixedExpenses, json.encode(list));
+  }
+
+  /// Load all fixed expenses (empty list if none saved).
+  List<FixedExpenseModel> getFixedExpenses() {
+    try {
+      final raw = _preferences?.getString(_keyFixedExpenses);
+      if (raw == null || raw.isEmpty) return [];
+      final decoded = json.decode(raw) as List;
+      return decoded
+          .cast<Map<String, dynamic>>()
+          .map(FixedExpenseModel.fromMap)
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// The month key ("yyyy-MM") of the last time fixed expenses were imported.
+  String? getLastFixedImportMonth() {
+    return _preferences?.getString(_keyLastFixedImportMonth);
+  }
+
+  Future<void> setLastFixedImportMonth(String monthKey) async {
+    await _preferences?.setString(_keyLastFixedImportMonth, monthKey);
   }
 }

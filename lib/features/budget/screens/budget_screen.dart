@@ -7,6 +7,7 @@ import '../../../core/utils/currency_input_formatter.dart';
 import '../../../data/models/budget_model.dart';
 import '../../../data/models/expense_model.dart';
 import '../../../data/services/budget_service.dart';
+import 'fixed_expense_screen.dart';
 
 class BudgetScreen extends StatefulWidget {
   const BudgetScreen({super.key});
@@ -16,12 +17,13 @@ class BudgetScreen extends StatefulWidget {
 }
 
 class _BudgetScreenState extends State<BudgetScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final BudgetService _budgetService = BudgetService();
   final TextEditingController _totalBudgetController = TextEditingController();
   final Map<ExpenseCategory, TextEditingController> _categoryControllers = {};
   final Map<ExpenseCategory, bool> _categoryEnabled = {};
 
+  late TabController _tabController;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   bool _isLoading = true;
@@ -35,6 +37,7 @@ class _BudgetScreenState extends State<BudgetScreen>
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 600),
       vsync: this,
@@ -194,6 +197,7 @@ class _BudgetScreenState extends State<BudgetScreen>
 
   @override
   void dispose() {
+    _tabController.dispose();
     _animationController.dispose();
     _totalBudgetController.dispose();
     for (final controller in _categoryControllers.values) {
@@ -204,52 +208,74 @@ class _BudgetScreenState extends State<BudgetScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: context.theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : FadeTransition(
-                opacity: _fadeAnimation,
-                child: CustomScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  slivers: [
-                    // Header
-                    SliverToBoxAdapter(child: _buildHeader(context)),
-
-                    // Content
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Total Budget Card
-                            _buildTotalBudgetCard(context),
-                            const Gap(24),
-
-                            // Category Budgets Section
-                            _buildCategoryBudgetsSection(context),
-                            const Gap(24),
-
-                            // Tips Card
-                            _buildTipsCard(context),
-                            const Gap(32),
-
-                            // Save Button
-                            _buildSaveButton(context),
-                            const Gap(12),
-
-                            // Delete Button (chỉ hiện khi đã có ngân sách)
-                            if (_hasBudget) _buildDeleteButton(context),
-                            const Gap(20),
-                          ],
-                        ),
-                      ),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: context.theme.scaffoldBackgroundColor,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(context),
+              Container(
+                color: context.isDarkMode ? const Color(0xFF1E293B) : const Color(0xFF10B981),
+                child: const TabBar(
+                  tabs: [
+                    Tab(
+                      icon: Icon(Icons.account_balance_wallet_outlined, size: 18),
+                      text: 'Ngân sách',
                     ),
+                    Tab(
+                      icon: Icon(Icons.repeat_rounded, size: 18),
+                      text: 'Cố định',
+                    ),
+                  ],
+                  indicatorColor: Colors.white,
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white60,
+                ),
+              ),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    // Tab 1: Budget content
+                    _isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : FadeTransition(
+                            opacity: _fadeAnimation,
+                            child: CustomScrollView(
+                              physics: const BouncingScrollPhysics(),
+                              slivers: [
+                                SliverToBoxAdapter(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(20),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                                      children: [
+                                        _buildTotalBudgetCard(context),
+                                        const Gap(24),
+                                        _buildCategoryBudgetsSection(context),
+                                        const Gap(24),
+                                        _buildTipsCard(context),
+                                        const Gap(32),
+                                        _buildSaveButton(context),
+                                        const Gap(12),
+                                        if (_hasBudget) _buildDeleteButton(context),
+                                        const Gap(20),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                    // Tab 2: Fixed expenses
+                    const FixedExpenseScreen(),
                   ],
                 ),
               ),
+            ],
+          ),
+        ),
       ),
     );
   }

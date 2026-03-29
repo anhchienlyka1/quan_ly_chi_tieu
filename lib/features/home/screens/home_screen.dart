@@ -19,7 +19,9 @@ import '../widgets/ai_assistant_popup.dart';
 import '../widgets/ai_insight_card.dart';
 import '../widgets/balance_card.dart';
 import '../widgets/draggable_ai_fab.dart';
+import '../widgets/fixed_expense_summary_card.dart';
 import '../widgets/goal_progress_card.dart';
+import '../widgets/monthly_fixed_import_dialog.dart';
 import '../widgets/notification_bottom_sheet.dart';
 import '../widgets/quick_shortcuts.dart';
 import '../widgets/recent_transactions_list.dart';
@@ -31,7 +33,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen> {
   int _currentNavIndex = 0;
   bool _isAiEnabled = true;
   bool _hasUrgentAlert = false;
@@ -65,6 +67,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _isAiEnabled = storage.isAiAssistantEnabled();
         _hasUrgentAlert = urgentAlert;
       });
+
+      // Show monthly fixed import dialog if needed
+      if (mounted) {
+        _checkAndShowMonthlyImport(provider);
+      }
+    }
+  }
+
+  Future<void> _checkAndShowMonthlyImport(ExpenseProvider provider) async {
+    if (provider.fixedExpenses.isEmpty) return;
+    final shouldShow = provider.shouldShowFixedImportDialog();
+    if (shouldShow && mounted) {
+      await showMonthlyFixedImportDialog(context);
     }
   }
 
@@ -326,7 +341,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ],
                         ),
                       )
-                      .animate(onPlay: (c) => c.repeat(reverse: true))
+                      .animate(onPlay: (c) => c.repeat(reverse: true, count: 3))
                       .fade(
                         begin: 0.5,
                         end: 1.0,
@@ -391,7 +406,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           color: AppColors.primary,
                         ),
                       )
-                      .animate(onPlay: (c) => c.repeat(), delay: 2000.ms)
+                      .animate(onPlay: (c) => c.repeat(count: 3), delay: 2000.ms)
                       .shake(hz: 4, rotation: 0.08, duration: 600.ms)
                       .then(delay: 3000.ms),
             ),
@@ -461,31 +476,35 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       child: Column(
         children: [
           // Shimmer balance card
-          Container(
-                height: 200,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppColors.primary.withOpacity(0.15),
-                      AppColors.primary.withOpacity(0.08),
-                    ],
+          RepaintBoundary(
+            child: Container(
+                  height: 200,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.primary.withOpacity(0.15),
+                        AppColors.primary.withOpacity(0.08),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(28),
                   ),
-                  borderRadius: BorderRadius.circular(28),
-                ),
-              )
-              .animate(onPlay: (c) => c.repeat())
-              .shimmer(duration: 1200.ms, color: Colors.white.withOpacity(0.3)),
+                )
+                .animate(onPlay: (c) => c.repeat(count: 5))
+                .shimmer(duration: 1200.ms, color: Colors.white.withOpacity(0.3)),
+          ),
           const Gap(24),
           // Shimmer chart
-          Container(
-                height: 180,
-                decoration: BoxDecoration(
-                  color: context.colorScheme.surface.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-              )
-              .animate(onPlay: (c) => c.repeat())
-              .shimmer(duration: 1200.ms, color: Colors.white.withOpacity(0.3)),
+          RepaintBoundary(
+            child: Container(
+                  height: 180,
+                  decoration: BoxDecoration(
+                    color: context.colorScheme.surface.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                )
+                .animate(onPlay: (c) => c.repeat(count: 5))
+                .shimmer(duration: 1200.ms, color: Colors.white.withOpacity(0.3)),
+          ),
         ],
       ),
     );
@@ -531,6 +550,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 .animate()
                 .fade(duration: 500.ms, delay: 200.ms)
                 .slideY(begin: 0.1, end: 0, curve: Curves.easeOutCubic),
+          const Gap(16),
+
+          // Fixed Expense Summary Card
+          const FixedExpenseSummaryCard()
+              .animate()
+              .fade(duration: 500.ms, delay: 230.ms)
+              .slideY(begin: 0.1, end: 0, curve: Curves.easeOutCubic),
           const Gap(28),
 
           // Goal Progress Card

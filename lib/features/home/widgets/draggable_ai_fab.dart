@@ -7,6 +7,10 @@ import '../../../core/extensions/context_extensions.dart';
 
 /// A draggable floating AI assistant button that can be moved freely
 /// across the screen. Displays a premium sparkle icon with glow animation.
+///
+/// Performance-optimised: uses a single AnimationController for glow/float,
+/// wraps the heavy paint in [RepaintBoundary], and avoids unnecessary
+/// setState calls by using AnimatedBuilder scoped to only the paint subtree.
 class DraggableAiFab extends StatefulWidget {
   final VoidCallback onTap;
   final bool showAlertDot;
@@ -22,23 +26,23 @@ class DraggableAiFab extends StatefulWidget {
 }
 
 class _DraggableAiFabState extends State<DraggableAiFab>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
   // Position state
   double _xPos = -1; // -1 means not initialized
   double _yPos = -1;
   bool _isDragging = false;
   bool _isInitialized = false;
 
-  // Animation controllers
-  late AnimationController _glowController;
-  late AnimationController _idleController;
-  late AnimationController _snapController;
+  // Single animation controller drives both glow & float
+  late AnimationController _animController;
 
-  // Snap animation values
+  // Snap animation (driven manually via Tween)
   double _snapStartX = 0;
   double _snapStartY = 0;
   double _snapEndX = 0;
   double _snapEndY = 0;
+  bool _isSnapping = false;
+  double _snapT = 1.0; // 0..1
 
   static const double _fabSize = 56.0;
   static const double _edgePadding = 16.0;
@@ -46,27 +50,15 @@ class _DraggableAiFabState extends State<DraggableAiFab>
   @override
   void initState() {
     super.initState();
-    _glowController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    )..repeat(reverse: true);
-
-    _idleController = AnimationController(
+    _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 3000),
-    )..repeat(reverse: true);
-
-    _snapController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    )..addListener(_onSnapAnimation);
+    )..repeat(); // single forward loop → cheaper than two independent repeats
   }
 
   @override
   void dispose() {
-    _glowController.dispose();
-    _idleController.dispose();
-    _snapController.dispose();
+    _animController.dispose();
     super.dispose();
   }
 
@@ -76,16 +68,8 @@ class _DraggableAiFabState extends State<DraggableAiFab>
     final padding = MediaQuery.of(context).padding;
     // Default position: bottom-right corner
     _xPos = size.width - _fabSize - _edgePadding;
-    _yPos = size.height - _fabSize - padding.bottom - 100; // Above bottom nav
+    _yPos = size.height - _fabSize - padding.bottom - 100;
     _isInitialized = true;
-  }
-
-  void _onSnapAnimation() {
-    setState(() {
-      final t = Curves.easeOutCubic.transform(_snapController.value);
-      _xPos = _snapStartX + (_snapEndX - _snapStartX) * t;
-      _yPos = _snapStartY + (_snapEndY - _snapStartY) * t;
-    });
   }
 
   void _snapToEdge(BuildContext context) {
@@ -95,21 +79,41 @@ class _DraggableAiFabState extends State<DraggableAiFab>
     _snapStartX = _xPos;
     _snapStartY = _yPos;
 
-    // Snap to nearest horizontal edge
     if (centerX < size.width / 2) {
       _snapEndX = _edgePadding;
     } else {
       _snapEndX = size.width - _fabSize - _edgePadding;
     }
 
-    // Clamp vertical position
     final padding = MediaQuery.of(context).padding;
     _snapEndY = _yPos.clamp(
       padding.top + _edgePadding,
       size.height - _fabSize - padding.bottom - 80,
     );
 
-    _snapController.forward(from: 0);
+    _isSnapping = true;
+    _snapT = 0.0;
+    // Drive snap by the already-running controller listener
+    _animController.addListener(_snapTick);
+  }
+
+  void _snapTick() {
+    if (!_isSnapping) {
+      _animController.removeListener(_snapTick);
+      return;
+    }
+    // Advance snap by elapsed fraction (≈16ms per frame → 300ms total)
+    _snapT += 1 / 18; // ~18 frames at 60fps ≈ 300ms
+    if (_snapT >= 1.0) {
+      _snapT = 1.0;
+      _isSnapping = false;
+      _animController.removeListener(_snapTick);
+    }
+    final t = Curves.easeOutCubic.transform(_snapT);
+    setState(() {
+      _xPos = _snapStartX + (_snapEndX - _snapStartX) * t;
+      _yPos = _snapStartY + (_snapEndY - _snapStartY) * t;
+    });
   }
 
   @override
@@ -122,7 +126,7 @@ class _DraggableAiFabState extends State<DraggableAiFab>
       child: GestureDetector(
         onPanStart: (_) {
           setState(() => _isDragging = true);
-          _snapController.stop();
+          _isSnapping = false;
           HapticFeedback.lightImpact();
         },
         onPanUpdate: (details) {
@@ -140,48 +144,33 @@ class _DraggableAiFabState extends State<DraggableAiFab>
           HapticFeedback.mediumImpact();
           widget.onTap();
         },
-        child: AnimatedScale(
-          scale: _isDragging ? 1.15 : 1.0,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
-          child: AnimatedBuilder(
-            animation: Listenable.merge([_glowController, _idleController]),
-            builder: (context, child) {
-              final glowValue = _glowController.value;
-              final idleValue = _idleController.value;
-              final floatOffset = _isDragging ? 0.0 : sin(idleValue * pi * 2) * 3;
+        child: RepaintBoundary(
+          child: AnimatedScale(
+            scale: _isDragging ? 1.15 : 1.0,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+            child: AnimatedBuilder(
+              animation: _animController,
+              builder: (context, _) {
+                final t = _animController.value; // 0→1 over 3s
+                // Glow uses a ping-pong curve
+                final glowValue = (sin(t * pi * 2) * 0.5 + 0.5);
+                // Float uses a slower sine
+                final floatOffset =
+                    _isDragging ? 0.0 : sin(t * pi * 2) * 3;
 
-              return Transform.translate(
-                offset: Offset(0, floatOffset),
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    _buildFab(context, glowValue),
-                    // Red notification dot for urgent alerts
-                    if (widget.showAlertDot)
-                      Positioned(
-                        right: 0,
-                        top: 0,
-                        child: Container(
-                          width: 14,
-                          height: 14,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEF4444),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFEF4444).withOpacity(0.5),
-                                blurRadius: 6,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              );
-            },
+                return Transform.translate(
+                  offset: Offset(0, floatOffset),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      _buildFab(context, glowValue),
+                      if (widget.showAlertDot) _buildAlertDot(),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
         ),
       )
@@ -193,6 +182,28 @@ class _DraggableAiFabState extends State<DraggableAiFab>
             curve: Curves.easeOutBack,
           )
           .fade(duration: 200.ms),
+    );
+  }
+
+  Widget _buildAlertDot() {
+    return Positioned(
+      right: 0,
+      top: 0,
+      child: Container(
+        width: 14,
+        height: 14,
+        decoration: BoxDecoration(
+          color: const Color(0xFFEF4444),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFEF4444).withOpacity(0.5),
+              blurRadius: 6,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -210,20 +221,16 @@ class _DraggableAiFabState extends State<DraggableAiFab>
           end: Alignment.bottomRight,
         ),
         boxShadow: [
-          // Primary glow
           BoxShadow(
             color: AppColors.aiGlow.withOpacity(0.25 + glowValue * 0.2),
             blurRadius: 16 + glowValue * 8,
             spreadRadius: 1 + glowValue * 2,
           ),
-          // Accent glow
           BoxShadow(
             color: AppColors.aiAccent.withOpacity(0.1 + glowValue * 0.1),
             blurRadius: 20,
-            spreadRadius: 0,
             offset: const Offset(0, 4),
           ),
-          // Drop shadow
           BoxShadow(
             color: Colors.black.withOpacity(isDark ? 0.4 : 0.15),
             blurRadius: 10,
@@ -234,19 +241,18 @@ class _DraggableAiFabState extends State<DraggableAiFab>
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Main icon
           const Icon(
             Icons.auto_awesome_rounded,
             color: Colors.white,
             size: 28,
           ),
-          // Orbiting sparkles
-          ...List.generate(4, (i) {
-            final angle = (i * (pi * 2 / 4)) +
-                (glowValue * pi * 0.5); // Slow rotation
-            final radius = 20.0;
+          // 2 orbiting sparkles (reduced from 4) — computed in the
+          // AnimatedBuilder callback so no extra setState.
+          ...List.generate(2, (i) {
+            final angle = (i * pi) + (glowValue * pi * 0.5);
+            const radius = 20.0;
             final sparkleOpacity =
-                (0.4 + sin(glowValue * pi * 2 + i * 1.2) * 0.4)
+                (0.4 + sin(glowValue * pi * 2 + i * 1.5) * 0.4)
                     .clamp(0.0, 1.0);
             return Positioned(
               left: _fabSize / 2 + cos(angle) * radius - 2,
